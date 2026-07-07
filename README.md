@@ -71,3 +71,18 @@ PNG → ICO: `tools\BuildIcon.ps1` (см. `tools/README.md`).
 ## Версия
 
 Задаётся в `DevCockpit.csproj` (`<Version>`) и `setup/WideS.iss` (`MyAppVersion`).
+
+## Git / GitHub
+
+Репозиторий: исходники в git, пользовательские данные (`%AppData%\WideS`) и артефакты сборки — в `.gitignore`.
+
+```powershell
+# Сборка
+dotnet publish -c Release -o publish
+
+# Первый push (после gh auth login)
+git remote add origin https://github.com/<user>/<repo>.git
+git push -u origin main
+```
+
+Авторизация GitHub CLI: `gh auth login` → https://github.com/login/device
