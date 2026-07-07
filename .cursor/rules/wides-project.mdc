@@ -1,0 +1,13 @@
+---
+description: Контекст проекта WideS (DevCockpit)
+alwaysApply: true
+---
+
+# WideS / DevCockpit
+
+- WPF + .NET 8, namespace `DevCockpit`, exe `WideS.exe`
+- Сборка: `dotnet publish -c Release -o publish` → `publish\WideS.exe`
+- Версия: `DevCockpit.csproj` (`<Version>`) и `setup/WideS.iss`
+- Данные пользователя: `%AppData%\WideS` — не в репозитории
+- UI на русском; не трогать `legacy/` (не в сборке)
+- Основной UI: `MainWindow.*.cs` (partial), стили в `App.xaml`
