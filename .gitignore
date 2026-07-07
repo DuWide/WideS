@@ -1,0 +1,25 @@
+# Build / publish artifacts
+bin/
+obj/
+
+# Local run (framework-dependent, needs .NET 8 Desktop Runtime)
+publish/
+publish-staging/
+
+# Setup intermediate + output (regenerate via setup/build-setup.bat)
+setup/WideS-Setup/app/
+setup/output/
+
+# User IDE
+*.user
+.vs/
+
+# Local backups (not part of the app)
+_DevCockpitBackups/
+
+# Sanitized AI snapshot — duplicate of root sources
+for-claude/src/
+
+# OS
+Thumbs.db
+Desktop.ini

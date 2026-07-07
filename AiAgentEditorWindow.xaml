@@ -1,0 +1,75 @@
+<Window x:Class="DevCockpit.AiAgentEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Ссылка"
+        Icon="Assets/WideS.ico"
+        Width="560"
+        Height="390"
+        MinWidth="520"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResize"
+        Background="Transparent">
+    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="56" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{StaticResource SidebarBrush}"
+                    CornerRadius="11,11,0,0"
+                    BorderBrush="#1E242C" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Right" Content="✕"
+                            Width="42" Height="42" Padding="0"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{StaticResource MutedBrush}"
+                            FontSize="14" Cursor="Hand"
+                            Click="Close_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="Transparent" Width="42" Height="42" CornerRadius="0,11,0,0">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#C42B1C" />
+                                        <Setter Property="Foreground" Value="White" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <TextBlock Text="Ссылка" Foreground="{StaticResource TextBrush}"
+                               FontWeight="SemiBold" FontSize="14"
+                               VerticalAlignment="Center" Margin="18,0,0,0" />
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="24,16,24,0">
+                <StackPanel>
+                    <TextBlock Text="Название" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
+                    <TextBox x:Name="NameBox" Margin="0,0,0,16" />
+                    <TextBlock Text="Ссылка" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
+                    <TextBox x:Name="UrlBox" Margin="0,0,0,16" />
+                    <TextBlock Text="Категория" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
+                    <ComboBox x:Name="CategoryBox" Height="40" IsEditable="False" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Row="2" Background="{StaticResource SidebarBrush}"
+                    CornerRadius="0,0,11,11"
+                    BorderBrush="#1E242C" BorderThickness="0,1,0,0">
+                <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <Button Content="Сохранить" Style="{StaticResource PrimaryButton}" Click="Save_Click" />
+                    <Button Content="Отмена" Style="{StaticResource GhostButton}" Click="Cancel_Click" />
+                </WrapPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,35 @@
+<Window x:Class="DevCockpit.WelcomeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WideS"
+        Icon="Assets/WideS.ico"
+        Width="580"
+        Height="390"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        KeyDown="Window_KeyDown">
+    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}"
+            MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Grid Background="{StaticResource AppBgBrush}" Margin="24">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Image Source="Assets/WideS.png" Width="72" Height="72" Margin="0,0,0,16" />
+                <TextBlock x:Name="WelcomeText"
+                           FontSize="28"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextBrush}"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="500" />
+                <TextBlock Text="WideS готов к работе"
+                           FontSize="14"
+                           Foreground="{StaticResource MutedBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,18" />
+                <Button Content="Продолжить" Style="{StaticResource PrimaryButton}" Background="#7B68EE" BorderBrush="#7B68EE" Width="180" Height="42" Click="Continue_Click" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

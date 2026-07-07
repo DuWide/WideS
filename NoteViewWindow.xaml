@@ -1,0 +1,94 @@
+<Window x:Class="DevCockpit.NoteViewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Заметка"
+        Icon="Assets/WideS.ico"
+        Width="880"
+        Height="660"
+        MinWidth="700"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResize"
+        Background="Transparent">
+    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="56" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{StaticResource SidebarBrush}"
+                    CornerRadius="11,11,0,0"
+                    BorderBrush="#1E242C" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Right" Content="✕"
+                            Width="42" Height="42" Padding="0"
+                            Foreground="{StaticResource MutedBrush}"
+                            FontSize="14" Cursor="Hand"
+                            Click="Close_Click">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd" Background="Transparent" Width="42" Height="42" CornerRadius="0,11,0,0">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="#C42B1C" />
+                                        <Setter Property="Foreground" Value="White" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <TextBlock x:Name="HeaderTitle" Text="Заметка" Foreground="{StaticResource TextBrush}"
+                               FontWeight="SemiBold" FontSize="14"
+                               VerticalAlignment="Center" Margin="18,0,0,0"
+                               TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Row="1" Padding="24,8,24,8" Background="{StaticResource AppBgBrush}">
+                <TextBlock x:Name="MetaText" FontSize="12" Foreground="{StaticResource MutedBrush}" />
+            </Border>
+
+            <TextBox x:Name="BodyText"
+                     Grid.Row="2"
+                     Margin="24,0,24,8"
+                     TextWrapping="Wrap"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas"
+                     FontSize="14"
+                     Background="#1A1F27"
+                     BorderBrush="#3C4653"
+                     BorderThickness="1"
+                     Padding="10,6" />
+
+            <Border Grid.Row="3" Margin="24,0,24,0" MaxHeight="96">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="Просмотр" FontSize="11"
+                               Foreground="{StaticResource MutedBrush}" Margin="0,0,0,4" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="PreviewPanel" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Row="4" Background="{StaticResource SidebarBrush}"
+                    CornerRadius="0,0,11,11"
+                    BorderBrush="#1E242C" BorderThickness="0,1,0,0">
+                <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <Button Content="Копировать" Style="{StaticResource GhostButton}" Click="Copy_Click" />
+                    <Button Content="Сохранить" Style="{StaticResource PrimaryButton}" Click="Save_Click" />
+                    <Button Content="Закрыть" Style="{StaticResource GhostButton}" Click="Close_Click" />
+                </WrapPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
