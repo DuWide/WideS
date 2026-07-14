@@ -118,7 +118,6 @@ public partial class MainWindow
     }
     private void Connect(ConnectionItem item)
     {
-        if (!string.IsNullOrWhiteSpace(item.Address)) WpfClipboard.SetText(item.Address);
         try
         {
             AddLog("OK", ConnectionService.Connect(item, _settings));

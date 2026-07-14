@@ -12,7 +12,7 @@
         AllowsTransparency="True"
         ResizeMode="CanResize"
         Background="Transparent">
-    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}">
+    <Border Style="{StaticResource DialogFrame}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="42" />
@@ -22,30 +22,12 @@
                 <RowDefinition Height="56" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource SidebarBrush}"
-                    CornerRadius="11,11,0,0"
-                    BorderBrush="#1E242C" BorderThickness="0,0,0,1"
+            <Border Grid.Row="0" Style="{StaticResource DialogHeader}"
+                    CornerRadius="7,7,0,0"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <DockPanel LastChildFill="True">
-                    <Button DockPanel.Dock="Right" Content="✕"
-                            Width="42" Height="42" Padding="0"
-                            Foreground="{StaticResource MutedBrush}"
-                            FontSize="14" Cursor="Hand"
-                            Click="Close_Click">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="Transparent" Width="42" Height="42" CornerRadius="0,11,0,0">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#C42B1C" />
-                                        <Setter Property="Foreground" Value="White" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource DialogCloseButton}" Click="Close_Click"><Path Data="{StaticResource CloseIconGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" /></Button>
                     <TextBlock x:Name="HeaderTitle" Text="Заметка" Foreground="{StaticResource TextBrush}"
                                FontWeight="SemiBold" FontSize="14"
                                VerticalAlignment="Center" Margin="18,0,0,0"
@@ -65,8 +47,8 @@
                      VerticalScrollBarVisibility="Auto"
                      FontFamily="Consolas"
                      FontSize="14"
-                     Background="#1A1F27"
-                     BorderBrush="#3C4653"
+                     Background="{DynamicResource InputBgBrush}"
+                     BorderBrush="{DynamicResource BorderMainBrush}"
                      BorderThickness="1"
                      Padding="10,6" />
 
@@ -81,8 +63,8 @@
             </Border>
 
             <Border Grid.Row="4" Background="{StaticResource SidebarBrush}"
-                    CornerRadius="0,0,11,11"
-                    BorderBrush="#1E242C" BorderThickness="0,1,0,0">
+                    CornerRadius="0,0,7,7"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
                 <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
                     <Button Content="Копировать" Style="{StaticResource GhostButton}" Click="Copy_Click" />
                     <Button Content="Сохранить" Style="{StaticResource PrimaryButton}" Click="Save_Click" />

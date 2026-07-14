@@ -3,30 +3,30 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="WideS"
         Icon="Assets/WideS.ico"
-        Width="520"
-        Height="500"
+        Width="460"
+        Height="440"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent">
-    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}"
+    <Border Style="{StaticResource DialogFrame}"
             MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-        <Grid Background="{StaticResource AppBgBrush}" Margin="30">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="330">
-                <Image Source="Assets/WideS.png" Width="118" Height="118" Margin="0,0,0,18" />
-                <TextBlock Text="WideS" FontSize="40" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="personal developer center" FontSize="14" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center" Margin="0,6,0,28" />
+        <Grid Background="{DynamicResource AppBgBrush}" Margin="34">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="310">
+                <Image Source="Assets/WideS.png" Width="82" Height="82" Margin="0,0,0,18" />
+                <TextBlock Text="WideS" FontFamily="{StaticResource DisplayFont}" FontSize="32" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="Личный рабочий центр" FontSize="13" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Center" Margin="0,5,0,26" />
                 <PasswordBox x:Name="PasswordInput"
-                             Height="46"
-                             FontSize="18"
-                             Padding="12"
-                             Background="#1A1F27"
-                             Foreground="{StaticResource TextBrush}"
-                             BorderBrush="#3C4653"
+                             Height="44"
+                             FontSize="16"
+                             Padding="12,8"
+                             Background="{DynamicResource InputBgBrush}"
+                             Foreground="{DynamicResource TextBrush}"
+                             BorderBrush="{DynamicResource BorderMainBrush}"
                              KeyDown="PasswordInput_KeyDown" />
-                <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0" TextAlignment="Center" />
-                <Button Content="Войти" Style="{StaticResource PrimaryButton}" Background="#7B68EE" BorderBrush="#7B68EE" Height="48" Margin="0,18,0,0" Click="Login_Click" />
+                <TextBlock x:Name="ErrorText" Foreground="{DynamicResource DangerBrush}" Margin="0,10,0,0" TextAlignment="Center" />
+                <Button Content="Войти" Style="{StaticResource PrimaryButton}" Height="44" Margin="0,18,0,0" Click="Login_Click" />
             </StackPanel>
         </Grid>
     </Border>

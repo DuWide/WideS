@@ -10,18 +10,18 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Background="Transparent">
-    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}">
+    <Border Style="{StaticResource DialogFrame}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Border Padding="16,14,16,10" BorderBrush="#1E242C" BorderThickness="0,0,0,1">
+            <Border Padding="16,14,16,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
                 <StackPanel>
                     <TextBox x:Name="SearchBox" FontSize="16" MinHeight="36"
                              KeyDown="SearchBox_KeyDown" TextChanged="SearchBox_TextChanged" />
-                    <TextBlock Text="Ctrl+K — поиск по проектам, задачам, заметкам, подключениям. Enter — открыть."
-                               Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,8,0,0" />
+                    <TextBlock Text="Проекты, задачи, заметки, подключения и буфер"
+                               Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>
             <ListBox x:Name="ResultsList" Grid.Row="1" BorderThickness="0"

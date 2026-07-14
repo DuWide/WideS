@@ -373,7 +373,7 @@ public partial class MainWindow
         layout.Children.Add(EditIconButton(() => EditNote(note)));
         layout.Children.Add(FavoriteIconButton(note.IsPinned, () => ToggleNotePinned(note), 34));
         stack.Children.Add(Muted($"{note.Category} · {note.UpdatedAt:yyyy-MM-dd HH:mm}"));
-        stack.Children.Add(Text(Preview(note.Text, 230), 14, WpfBrushes.WhiteSmoke, new Thickness(0, 12, 0, 12)));
+        stack.Children.Add(Text(Preview(note.Text, 230), 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 12, 0, 12)));
         var buttons = new WrapPanel();
         buttons.Children.Add(ActionButton("Подключения", () => ScanNoteConnections(note), false));
         buttons.Children.Add(ActionButton("Копировать", () => Copy(note.Text, "Текст заметки скопирован."), false));

@@ -128,6 +128,7 @@ public static class UiHelpers
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(8, 3, 8, 3),
             Margin = new Thickness(0, 0, 8, 0),
+            HorizontalAlignment = HorizontalAlignment.Left,
             Child = new TextBlock
             {
                 Text = text,

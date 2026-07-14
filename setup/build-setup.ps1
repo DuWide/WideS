@@ -12,8 +12,22 @@ Set-Location $root
 
 Get-Process -Name "WideS" -ErrorAction SilentlyContinue | Stop-Process -Force
 
+$stagingParent = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "WideS-Setup")).TrimEnd('\')
+$stagingApp = [IO.Path]::GetFullPath($appDir).TrimEnd('\')
+if ([IO.Path]::GetDirectoryName($stagingApp) -ne $stagingParent -or
+    [IO.Path]::GetFileName($stagingApp) -ne "app") {
+    throw "Unsafe setup staging path: $stagingApp"
+}
+if (Test-Path -LiteralPath $stagingApp) {
+    Remove-Item -LiteralPath $stagingApp -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $stagingApp | Out-Null
+
 Write-Host "Publishing self-contained WideS for win-x64..."
 dotnet publish -c Release -p:PublishProfile=Setup-win-x64
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish failed with exit code $LASTEXITCODE"
+}
 
 if (-not (Test-Path (Join-Path $appDir "WideS.exe"))) {
     throw "WideS.exe not found in $appDir"

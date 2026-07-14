@@ -79,10 +79,12 @@ public sealed class AppSettingsData
     public string DockPosition { get; set; } = "Center";
     public bool DockAutoHide { get; set; }
     public bool RunAtStartup { get; set; }
-    public string AccentTheme { get; set; } = "Blue";
+    public string AccentTheme { get; set; } = "Dark";
     public bool CompactSidebar { get; set; }
     public string WorkMode { get; set; } = "Work";
     public bool TelegramEnabled { get; set; }
+    public string TelegramSource { get; set; } = "DesktopExport";
+    public string TelegramDesktopExportPath { get; set; } = "";
     public string TelegramBotTokenEncrypted { get; set; } = "";
     public long TelegramLastUpdateId { get; set; }
     public long TelegramBotId { get; set; } = 778912409;
@@ -90,6 +92,31 @@ public sealed class AppSettingsData
     public bool PortalEnabled { get; set; }
     public int PortalPort { get; set; } = 7788;
     public bool ClipboardScreenshotPrompt { get; set; } = true;
+    public bool ClipboardHistoryEnabled { get; set; } = true;
+}
+
+public sealed record SelectOption(string Label, string Value)
+{
+    public override string ToString() => Label;
+}
+
+public sealed class ClipboardHistoryItem
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Kind { get; set; } = "Текст";
+    public string Preview { get; set; } = "";
+    public string EncryptedContent { get; set; } = "";
+    public string ImagePath { get; set; } = "";
+    public string SourceApp { get; set; } = "";
+    public string ContentHash { get; set; } = "";
+    public bool IsSensitive { get; set; }
+    public bool IsPinned { get; set; }
+    public DateTime CapturedAt { get; set; } = DateTime.Now;
+}
+
+public sealed class ClipboardHistoryStoreData
+{
+    public List<ClipboardHistoryItem> Items { get; set; } = [];
 }
 
 public sealed class CommandRecipeItem
@@ -203,4 +230,3 @@ public sealed class ScanResult
     public List<XmlFolderInfo> XmlFolders { get; } = [];
     public List<string> ResultFiles { get; } = [];
 }
-

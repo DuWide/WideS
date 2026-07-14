@@ -81,7 +81,9 @@ public partial class MainWindow : Window
     private readonly MediaService _mediaService = new();
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _telegramTimer = new() { Interval = TimeSpan.FromSeconds(45) };
+    private readonly DispatcherTimer _clipboardCaptureTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private readonly TelegramTaskService _telegramTaskService = new();
+    private DateTime _lastTelegramDesktopWriteUtc = DateTime.MinValue;
     private TaskReminderWindow? _activeReminderWindow;
     private Guid? _activeTaskPillId;
     private Guid? _trackedTaskId;
@@ -89,6 +91,7 @@ public partial class MainWindow : Window
     private bool _allowExit;
     private HwndSource? _hwndSource;
     private FloatingDockWindow? _dockWindow;
+    private GlobalSearchWindow? _globalSearchWindow;
     private string? _lastClipboardImageHash;
     private DateTime _lastScreenshotPromptAt = DateTime.MinValue;
 
@@ -103,6 +106,11 @@ public partial class MainWindow : Window
         SetupTrayIcon();
         _taskTimer.Tick += (_, _) => CheckTaskReminders();
         _taskTimer.Start();
+        _clipboardCaptureTimer.Tick += (_, _) =>
+        {
+            _clipboardCaptureTimer.Stop();
+            HandleClipboardUpdate();
+        };
         _pillTimer.Tick += (_, _) => UpdateActiveTaskPill();
         Loaded += (_, _) =>
         {
@@ -115,13 +123,14 @@ public partial class MainWindow : Window
         InitializeNowPlaying();
         InitializeTelegramPolling();
         InitializePortal();
+        InitializePulse();
         AddLog("OK", "WideS запущен.");
     }
 
     private void InitializeTelegramPolling()
     {
         _telegramTimer.Tick += async (_, _) => await PollTelegramTasksAsync();
-        if (_settings.TelegramEnabled && !string.IsNullOrWhiteSpace(SecretService.Unprotect(_settings.TelegramBotTokenEncrypted)))
+        if (CanPollTelegram())
         {
             _telegramTimer.Start();
             _ = PollTelegramTasksAsync();
@@ -235,28 +244,72 @@ public partial class MainWindow : Window
         win.Show();
     }
 
-    private async Task PollTelegramTasksAsync()
-    {
-        if (!_settings.TelegramEnabled) return;
+    private bool UsesTelegramDesktopExport() =>
+        !_settings.TelegramSource.Equals("BotApi", StringComparison.OrdinalIgnoreCase);
 
-        var result = await _telegramTaskService.PollAsync(_settings);
+    private bool CanPollTelegram()
+    {
+        if (!_settings.TelegramEnabled) return false;
+        return UsesTelegramDesktopExport()
+            ? !string.IsNullOrWhiteSpace(_settings.TelegramDesktopExportPath)
+            : !string.IsNullOrWhiteSpace(SecretService.Unprotect(_settings.TelegramBotTokenEncrypted));
+    }
+
+    private async Task PollTelegramTasksAsync(bool force = false, bool showSummary = false)
+    {
+        if (!force && !_settings.TelegramEnabled) return;
+
+        TelegramPollResult result;
+        if (UsesTelegramDesktopExport())
+        {
+            var path = _settings.TelegramDesktopExportPath;
+            if (!force && File.Exists(path))
+            {
+                var writeUtc = File.GetLastWriteTimeUtc(path);
+                if (writeUtc == _lastTelegramDesktopWriteUtc) return;
+            }
+
+            result = await _telegramTaskService.ImportDesktopExportAsync(path);
+            if (result.Success && File.Exists(path))
+            {
+                _lastTelegramDesktopWriteUtc = File.GetLastWriteTimeUtc(path);
+            }
+        }
+        else
+        {
+            result = await _telegramTaskService.PollAsync(_settings);
+        }
+
         if (!result.Success)
         {
             if (!string.IsNullOrWhiteSpace(result.Error))
             {
                 AddLog("ERR", $"Telegram: {result.Error}");
+                if (showSummary) WpfMessageBox.Show(this, result.Error, "Импорт Telegram");
             }
             return;
         }
 
-        if (result.LastUpdateId > _settings.TelegramLastUpdateId)
+        if (!UsesTelegramDesktopExport() && result.LastUpdateId > _settings.TelegramLastUpdateId)
         {
             _settings.TelegramLastUpdateId = result.LastUpdateId;
             _settingsStore.Save(_settings);
         }
 
+        var added = ImportTelegramTasks(result.Tasks);
+        if (showSummary)
+        {
+            var source = UsesTelegramDesktopExport() ? "экспорте Telegram Desktop" : "Bot API";
+            WpfMessageBox.Show(this,
+                $"Проверка завершена.\n\nНайдено задач в {source}: {result.Tasks.Count}\nДобавлено новых: {added}",
+                "Импорт Telegram");
+        }
+    }
+
+    private int ImportTelegramTasks(IEnumerable<TelegramIncomingTask> incomingTasks)
+    {
         var added = 0;
-        foreach (var incoming in result.Tasks)
+        foreach (var incoming in incomingTasks)
         {
             if (_tasks.Tasks.Any(t =>
                     (!string.IsNullOrWhiteSpace(t.TelegramKey) && t.TelegramKey == incoming.TelegramKey) ||
@@ -266,18 +319,15 @@ public partial class MainWindow : Window
             }
 
             var parsed = incoming.Parsed;
-            var endAt = parsed.StartAt.AddHours(2);
-            if (endAt <= parsed.StartAt)
-            {
-                endAt = parsed.StartAt.AddHours(1);
-            }
+            var startAt = parsed.StartAt.Year >= 2000 ? parsed.StartAt : DateTime.Now;
+            var endAt = startAt.AddHours(2);
 
             var task = new TaskItem
             {
                 Title = parsed.Title,
                 Description = parsed.Description,
                 Status = "Выполняется",
-                StartAt = parsed.StartAt,
+                StartAt = startAt,
                 EndAt = endAt,
                 ReminderAt = null,
                 ContactName = parsed.ContactName,
@@ -290,18 +340,20 @@ public partial class MainWindow : Window
             added++;
         }
 
-        if (added <= 0) return;
+        if (added <= 0) return 0;
 
         _tasksStore.Save(_tasks);
         AddLog("OK", $"Telegram: добавлено задач {added}.");
         if (_currentViewKey == "tasks") ShowTasks();
         else if (_currentViewKey == "home") ShowHome();
+        return added;
     }
 
     private void RestartTelegramPolling()
     {
         _telegramTimer.Stop();
-        if (_settings.TelegramEnabled && !string.IsNullOrWhiteSpace(SecretService.Unprotect(_settings.TelegramBotTokenEncrypted)))
+        _lastTelegramDesktopWriteUtc = DateTime.MinValue;
+        if (CanPollTelegram())
         {
             _telegramTimer.Start();
             _ = PollTelegramTasksAsync();
@@ -322,6 +374,7 @@ public partial class MainWindow : Window
         _tasks = _tasksStore.Load();
         _activity = _activityStore.Load();
         _templates = _templatesStore.Load();
+        _clipboardHistory = _clipboardStore.Load();
         EnsureCommandRecipeDefaults();
         EnsureAiAgentDefaults();
         EnsureProjectTemplateDefaults();
@@ -393,6 +446,9 @@ public partial class MainWindow : Window
         "backup" => "nav-backup",
         "dropzone" => "nav-dropzone",
         "settings" => "nav-settings",
+        "clipboard" => "nav-clipboard",
+        "pulse" => "nav-pulse",
+        "favorites" => "star",
         _ => "nav-home"
     };
 
@@ -415,6 +471,7 @@ public partial class MainWindow : Window
             ToolTip = text,
             Style = RequireStyle("NavButton")
         };
+        System.Windows.Automation.AutomationProperties.SetName(button, text);
         button.Click += (_, _) =>
         {
             _activeTopNavKey = null;
@@ -426,12 +483,21 @@ public partial class MainWindow : Window
 
     private void AddTopNav(string text, string key, Action action)
     {
+        var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        content.Children.Add(MakeIcon(NavIconKey(key), 14));
+        content.Children.Add(new TextBlock
+        {
+            Text = text,
+            Margin = new Thickness(7, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
         var button = new WpfButton
         {
-            Content = text,
+            Content = content,
             Tag = key,
             Style = RequireStyle("TopNavPill")
         };
+        System.Windows.Automation.AutomationProperties.SetName(button, text);
         button.Click += (_, _) => action();
         _topNavButtons[key] = button;
         TopNavPanel.Children.Add(button);
@@ -444,18 +510,16 @@ public partial class MainWindow : Window
         {
             "home"        => "home",
             "projects"    => "projects",
-            "tasks"       => "tasks",
-            "notes"       => "notes",
-            "connections" => "connections",
             "contacts"    => "contacts",
             "ai"          => "ai",
             "commands"    => "commands",
             "backup"      => "backup",
-            "dropzone"    => "dropzone",
             "settings"    => "settings",
+            "clipboard"   => "clipboard",
+            "pulse"       => "pulse",
             _ => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase) ? "projects" : null
         };
-        var topKey = key is "favorites" or "history" ? key : null;
+        var topKey = key is "notes" or "connections" or "tasks" or "dropzone" or "favorites" ? key : null;
 
         if (sideKey is not null)
         {
@@ -464,6 +528,7 @@ public partial class MainWindow : Window
         }
         else if (topKey is not null)
         {
+            _activeSideNavKey = null;
             _activeTopNavKey = topKey;
         }
 
@@ -497,6 +562,10 @@ public partial class MainWindow : Window
 
     private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
 
+    private void GlobalSearch_Click(object sender, RoutedEventArgs e) => ShowGlobalSearch();
+
+    private void DockToggle_Click(object sender, RoutedEventArgs e) => ToggleDock();
+
     private void CloseWindow_Click(object sender, RoutedEventArgs e) => HideToTray();
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -509,7 +578,7 @@ public partial class MainWindow : Window
         RegisterHotKey(handle, HotkeyNewTask, ModAlt, VkF2);
         RegisterHotKey(handle, HotkeyDock, ModAlt | ModControl, VkSpace);
         RegisterHotKey(handle, HotkeySearch, ModControl, VkK);
-        if (_settings.ClipboardScreenshotPrompt)
+        if (_settings.ClipboardScreenshotPrompt || _settings.ClipboardHistoryEnabled)
         {
             AddClipboardFormatListener(handle);
         }
@@ -537,6 +606,8 @@ public partial class MainWindow : Window
         RemoveClipboardFormatListener(handle);
         _hwndSource?.RemoveHook(WndProc);
         _dockWindow?.Close();
+        _pulseTimer.Stop();
+        _clipboardCaptureTimer.Stop();
         _trayIcon?.Dispose();
         ShutdownPortalService();
         base.OnClosing(e);
@@ -573,7 +644,8 @@ public partial class MainWindow : Window
         }
         else if (msg == WmClipboardUpdate)
         {
-            Dispatcher.BeginInvoke(HandleClipboardUpdate);
+            _clipboardCaptureTimer.Stop();
+            _clipboardCaptureTimer.Start();
         }
         else if (msg == WmGetMinMaxInfo)
         {
@@ -614,7 +686,7 @@ public partial class MainWindow : Window
         if (handle == IntPtr.Zero) return;
 
         RemoveClipboardFormatListener(handle);
-        if (_settings.ClipboardScreenshotPrompt)
+        if (_settings.ClipboardScreenshotPrompt || _settings.ClipboardHistoryEnabled)
         {
             AddClipboardFormatListener(handle);
         }
@@ -622,6 +694,7 @@ public partial class MainWindow : Window
 
     private void HandleClipboardUpdate()
     {
+        CaptureCurrentClipboard();
         if (!_settings.ClipboardScreenshotPrompt) return;
         if (DateTime.Now - _lastScreenshotPromptAt < TimeSpan.FromMilliseconds(700)) return;
         if (!ClipboardHasBitmapWithoutText()) return;
@@ -720,15 +793,14 @@ public partial class MainWindow : Window
         CloseButton.Content = MakeIcon("close", 16);
         BackButton.Content = MakeIcon("back", 18);
         ForwardButton.Content = MakeIcon("forward", 18);
+        GlobalSearchButton.Content = MakeIcon("search", 15);
+        DockToggleButton.Content = MakeIcon("dock", 15);
         StyleQuietIconButton(BackButton);
         StyleQuietIconButton(ForwardButton);
     }
 
     private void StyleQuietIconButton(WpfButton button)
     {
-        button.Background = (WpfBrush)FindResource("PanelBrush");
-        button.BorderBrush = ThemeBorderMain();
-        button.Foreground = (WpfBrush)FindResource("TextBrush");
         button.Padding = new Thickness(0);
     }
 
@@ -851,6 +923,8 @@ public partial class MainWindow : Window
                 case "dropzone": ShowDropZone(); break;
                 case "backup": ShowBackupContext(); break;
                 case "settings": ShowSettings(); break;
+                case "clipboard": ShowClipboardHistory(); break;
+                case "pulse": ShowPulse(); break;
                 default: ShowHome(); break;
             }
         }
@@ -874,9 +948,11 @@ public partial class MainWindow : Window
                 Margin = new Thickness(0, 2, 6, 2),
                 CornerRadius = new CornerRadius(8),
                 Background = key == _currentViewKey
-                    ? new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#008B8B"))
+                    ? (WpfBrush)FindResource("FilterBgBrush")
                     : (WpfBrush)FindResource("PanelBrush"),
-                BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#008B8B")),
+                BorderBrush = key == _currentViewKey
+                    ? (WpfBrush)FindResource("FilterBorderBrush")
+                    : (WpfBrush)FindResource("BorderMainBrush"),
                 BorderThickness = new Thickness(1),
                 ToolTip = title
             };
@@ -1156,8 +1232,16 @@ public partial class MainWindow : Window
 
     private void ShowGlobalSearch()
     {
-        var window = new GlobalSearchWindow(SearchAll) { Owner = this };
-        window.ShowDialog();
+        if (_globalSearchWindow is { IsVisible: true })
+        {
+            _globalSearchWindow.Activate();
+            return;
+        }
+
+        _globalSearchWindow = new GlobalSearchWindow(SearchAll) { Owner = this };
+        _globalSearchWindow.Closed += (_, _) => _globalSearchWindow = null;
+        WindowPlacementService.PlaceOnPrimary(_globalSearchWindow);
+        _globalSearchWindow.Show();
     }
 
     private IReadOnlyList<GlobalSearchWindow.SearchHit> SearchAll(string query)
@@ -1199,6 +1283,31 @@ public partial class MainWindow : Window
         {
             hits.Add((connection.CreatedAt,
                 new GlobalSearchWindow.SearchHit("Подключение", connection.Name, $"{connection.Type}: {connection.Address}", () => Connect(connection))));
+        }
+
+        foreach (var link in _aiAgents.Agents.Where(x =>
+                     x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                     x.Url.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                     x.Category.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        {
+            hits.Add((link.CreatedAt,
+                new GlobalSearchWindow.SearchHit("Ссылка", link.Name, link.Url, () => OpenUrl(link.Url, link.Name))));
+        }
+
+        foreach (var recipe in _commandRecipes.Recipes.Where(x =>
+                     x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                     x.Command.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        {
+            hits.Add((recipe.CreatedAt,
+                new GlobalSearchWindow.SearchHit("Команда", recipe.Name, recipe.Command, () => RunCommandRecipe(recipe))));
+        }
+
+        foreach (var item in _clipboardHistory.Items.Where(x => !x.IsSensitive &&
+                     (x.Preview.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                      x.Kind.Contains(query, StringComparison.OrdinalIgnoreCase))))
+        {
+            hits.Add((item.CapturedAt,
+                new GlobalSearchWindow.SearchHit("Буфер", item.Kind, item.Preview, () => CopyClipboardItem(item))));
         }
 
         return hits.OrderByDescending(x => x.SortAt).Select(x => x.Hit).Take(20).ToList();
@@ -1306,7 +1415,18 @@ public partial class MainWindow : Window
 
     private Border Card(string title)
     {
-        return new Border { Style = (Style)FindResource("Card"), Width = 340, MinHeight = 170 };
+        var card = new Border { Style = (Style)FindResource("Card"), Width = 352, MinHeight = 158 };
+        card.MouseEnter += (_, _) =>
+        {
+            card.Background = (WpfBrush)FindResource("CardHoverBrush");
+            card.BorderBrush = (WpfBrush)FindResource("AccentBorderBrush");
+        };
+        card.MouseLeave += (_, _) =>
+        {
+            card.Background = (WpfBrush)FindResource("CardBrush");
+            card.BorderBrush = (WpfBrush)FindResource("BorderMainBrush");
+        };
+        return card;
     }
 
     private Border CardText(string title, string text)
@@ -1337,16 +1457,7 @@ public partial class MainWindow : Window
         var actions = new WrapPanel { Margin = new Thickness(0) };
         buildActions(actions);
 
-        var actionShell = new Border
-        {
-            Background = (WpfBrush)FindResource("PanelBrush"),
-            BorderBrush = ThemeBorderMain(),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10),
-            Margin = new Thickness(8, 8, 8, 14),
-            Child = actions
-        };
+        var actionShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = actions };
         DockPanel.SetDock(actionShell, Dock.Top);
         root.Children.Add(actionShell);
 
@@ -1430,21 +1541,22 @@ public partial class MainWindow : Window
             Content = text,
             Style = (Style)FindResource("GhostButton"),
             Height = 36,
-            MinWidth = 86,
+            MinWidth = 78,
             MaxHeight = 36,
             Padding = new Thickness(12, 6, 12, 6),
             Margin = new Thickness(3),
             VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             Cursor = System.Windows.Input.Cursors.Hand
         };
-        var bg = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("TealSoftBgBrush");
-        var border = selected ? (WpfBrush)FindResource("FilterBorderBrush") : (WpfBrush)FindResource("TealBorderBrush");
+        var bg = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("GhostButtonBgBrush");
+        var border = selected ? (WpfBrush)FindResource("FilterBorderBrush") : (WpfBrush)FindResource("BorderMainBrush");
         button.Background = bg;
         button.BorderBrush = border;
         button.Foreground = (WpfBrush)FindResource("TextBrush");
         button.MouseEnter += (_, _) =>
         {
-            button.Background = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("TealSoftBgBrush");
+            button.Background = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("CardHoverBrush");
         };
         button.MouseLeave += (_, _) =>
         {
@@ -1462,7 +1574,10 @@ public partial class MainWindow : Window
     private void ApplyCardView(Border card, double tileWidth = 340)
     {
         var mode = GetViewMode(_viewScope);
-        card.Width = mode == ViewDisplayMode.Tile ? tileWidth : 760;
+        card.Width = mode == ViewDisplayMode.Tile ? tileWidth : double.NaN;
+        card.HorizontalAlignment = mode == ViewDisplayMode.Tile
+            ? System.Windows.HorizontalAlignment.Left
+            : System.Windows.HorizontalAlignment.Stretch;
         card.MinHeight = mode == ViewDisplayMode.Tile ? 200 : 44;
     }
 
@@ -1473,11 +1588,11 @@ public partial class MainWindow : Window
             Background = (WpfBrush)FindResource("CardBrush"),
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(12, 8, 12, 8),
-            Margin = new Thickness(8, 3, 8, 3),
-            Width = 760,
-            MinHeight = 42,
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(12, 7, 10, 7),
+            Margin = new Thickness(6, 2, 6, 2),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+            MinHeight = 40,
             Cursor = System.Windows.Input.Cursors.Hand
         };
 
@@ -1550,8 +1665,8 @@ public partial class MainWindow : Window
         return importance.Equals("Red", StringComparison.OrdinalIgnoreCase)
             ? (WpfBrush)FindResource("DangerBrush")
             : importance.Equals("Yellow", StringComparison.OrdinalIgnoreCase)
-                ? new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF8C00"))
-                : new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#228B22"));
+                ? (WpfBrush)FindResource("WarnBrush")
+                : (WpfBrush)FindResource("SuccessBrush");
     }
 
     private static string ImportanceText(string importance)
@@ -1614,16 +1729,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        ShowFromTray();
         switch (action.Action)
         {
             case "start":
                 StartTask(task, openEditor: false);
                 break;
-            case "snooze15":
-                SnoozeTask(task, TimeSpan.FromMinutes(15));
+            case "snooze":
+                SnoozeTask(task, TimeSpan.FromMinutes(action.SnoozeMinutes));
                 break;
             default:
+                ShowFromTray();
                 EditTask(task);
                 break;
         }
@@ -1631,14 +1746,18 @@ public partial class MainWindow : Window
 
     private void SnoozeTask(TaskItem task, TimeSpan snooze)
     {
+        var duration = task.EndAt > task.StartAt
+            ? task.EndAt - task.StartAt
+            : TimeSpan.FromHours(1);
         task.StartAt = DateTime.Now.Add(snooze);
-        task.EndAt = task.StartAt.AddHours(1);
+        task.EndAt = task.StartAt.Add(duration);
         task.ReminderAt = task.StartAt;
         task.LastNotifiedAt = null;
-        task.Status = "Новая";
+        task.Status = $"Отложено до {task.StartAt:dd.MM.yyyy HH:mm}";
         _tasksStore.Save(_tasks);
         AddLog("OK", $"Задача отложена: {task.Title}");
         TaskNotificationService.ClearReminder(task.Id);
+        RefreshTasksView();
     }
 
     private static bool IsTaskRunning(TaskItem task) =>
@@ -1661,7 +1780,7 @@ public partial class MainWindow : Window
     private StackPanel BaseCardStack(string title)
     {
         var stack = new StackPanel();
-        stack.Children.Add(Text(title, 18, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 0, 0, 12), FontWeights.SemiBold));
+        stack.Children.Add(Text(title, 16, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 0, 0, 10), FontWeights.SemiBold));
         return stack;
     }
 
@@ -1679,11 +1798,12 @@ public partial class MainWindow : Window
             Content = text,
             Style = (Style)FindResource(primary ? "PrimaryButton" : "GhostButton"),
             Height = 36,
-            MinWidth = 86,
+            MinWidth = 78,
             MaxHeight = 36,
             Padding = new Thickness(12, 6, 12, 6),
             Margin = new Thickness(3, 3, 3, 3),
-            VerticalAlignment = VerticalAlignment.Top
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Left
         };
         ApplyButtonTone(button, text, primary);
         button.Click += (_, _) => action();
@@ -1693,28 +1813,37 @@ public partial class MainWindow : Window
     private void ApplyButtonTone(WpfButton button, string text, bool primary)
     {
         var lower = text.ToLowerInvariant();
-        var bgKey = primary ? "ActionSoftBgBrush" : "PanelBrush";
-        var borderKey = primary ? "ActionBorderBrush" : "AccentBorderBrush";
+        var bgKey = primary ? "PrimaryButtonBgBrush" : "GhostButtonBgBrush";
+        var borderKey = primary ? "PrimaryButtonBgBrush" : "GhostButtonBorderBrush";
+        var foregroundKey = primary ? "AccentForegroundBrush" : "TextBrush";
 
-        if (lower.Contains("удал") || lower.Contains("очист") || lower.Contains("заверш"))
+        if (lower.Contains("удал") || lower.Contains("очист"))
         {
             bgKey = "DangerSoftBgBrush";
             borderKey = "DangerBrush";
         }
-        else if (lower.Contains("фокус") || lower.Contains("приступ") || lower.Contains("выполн") || lower.Contains("начать"))
+        else if (lower.Contains("пауза") || lower.Contains("отлож"))
         {
             bgKey = "FocusWarnBgBrush";
             borderKey = "WarnBrush";
+        }
+        else if (lower.Contains("заверш"))
+        {
+            bgKey = "SuccessSoftBgBrush";
+            borderKey = "SuccessBrush";
         }
         else if ((lower.Contains("плит") || lower.Contains("спис")) && primary)
         {
             bgKey = "FilterBgBrush";
             borderKey = "FilterBorderBrush";
+            foregroundKey = "TextBrush";
         }
 
         button.Background = (WpfBrush)FindResource(bgKey);
         button.BorderBrush = (WpfBrush)FindResource(borderKey);
-        button.Foreground = (WpfBrush)FindResource("TextBrush");
+        button.Foreground = primary && foregroundKey == "AccentForegroundBrush"
+            ? WpfBrushes.White
+            : (WpfBrush)FindResource(foregroundKey);
     }
 
     private WpfButton LinkAction(string text, Action action)
@@ -1727,7 +1856,7 @@ public partial class MainWindow : Window
             Foreground = (WpfBrush)FindResource("MutedBrush"),
             Padding = new Thickness(0, 4, 16, 4),
             Margin = new Thickness(0, 2, 10, 2),
-            Height = 30,
+            Height = 28,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             Cursor = System.Windows.Input.Cursors.Hand
@@ -1738,9 +1867,9 @@ public partial class MainWindow : Window
 
     private WpfButton EditIconButton(Action action)
     {
-        var button = IconButton("edit", action, "Редактировать", 28);
-        button.Background = (WpfBrush)FindResource("PanelBrush");
-        button.BorderBrush = (WpfBrush)FindResource("ActionBorderBrush");
+        var button = IconButton("edit", action, "Редактировать", 30);
+        button.Background = (WpfBrush)FindResource("ElevatedBgBrush");
+        button.BorderBrush = (WpfBrush)FindResource("BorderMainBrush");
         button.Foreground = (WpfBrush)FindResource("TextBrush");
         button.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
         button.VerticalAlignment = VerticalAlignment.Top;
@@ -1748,7 +1877,7 @@ public partial class MainWindow : Window
         return button;
     }
 
-    private WpfButton IconButton(string iconName, Action action, string tooltip, double size = 34)
+    private WpfButton IconButton(string iconName, Action action, string tooltip, double size = 32)
     {
         var button = new WpfButton
         {
@@ -1761,13 +1890,14 @@ public partial class MainWindow : Window
             Padding = new Thickness(0),
             Margin = new Thickness(3, 3, 3, 3),
             Background = (WpfBrush)FindResource("PanelBrush"),
-            BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#008B8B")),
-            Foreground = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#EEF3F7")),
+            BorderBrush = (WpfBrush)FindResource("BorderMainBrush"),
+            Foreground = (WpfBrush)FindResource("IconBrush"),
             BorderThickness = new Thickness(1),
             Cursor = System.Windows.Input.Cursors.Hand,
             ToolTip = tooltip,
             VerticalAlignment = VerticalAlignment.Top
         };
+        System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
         button.Click += (_, _) => action();
         return button;
     }
@@ -1775,8 +1905,8 @@ public partial class MainWindow : Window
     private WpfButton FavoriteIconButton(bool isPinned, Action action, double rightOffset = 0)
     {
         var button = IconButton("star", action, isPinned ? "Убрать из избранного" : "Добавить в избранное", 28);
-        button.Background = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isPinned ? "#4A4618" : "#20262E"));
-        button.BorderBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isPinned ? "#B8A900" : "#3A4451"));
+        button.Background = isPinned ? (WpfBrush)FindResource("FocusWarnBgBrush") : (WpfBrush)FindResource("PanelBrush");
+        button.BorderBrush = isPinned ? (WpfBrush)FindResource("WarnBrush") : (WpfBrush)FindResource("BorderMainBrush");
         button.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
         button.VerticalAlignment = VerticalAlignment.Top;
         button.Margin = new Thickness(0, 0, rightOffset, 0);
@@ -1785,47 +1915,7 @@ public partial class MainWindow : Window
 
     private FrameworkElement MakeIcon(string iconName, double size)
     {
-        var geometry = iconName switch
-        {
-            "edit" => "M3 17.25V21h3.75L17.8 9.95l-3.75-3.75L3 17.25z M20.7 7.05c.4-.4.4-1 0-1.4l-2.35-2.35c-.4-.4-1-.4-1.4 0l-1.85 1.85 3.75 3.75 1.85-1.85z",
-            "grid" => "M3 3h7v7H3V3z M14 3h7v7h-7V3z M3 14h7v7H3v-7z M14 14h7v7h-7v-7z",
-            "table" => "M4 5h16v2H4V5z M4 10h7v9H4v-9z M13 10h7v9h-7v-9z",
-            "list" => "M4 6h16v2H4V6z M4 11h16v2H4v-2z M4 16h16v2H4v-2z",
-            "back" => "M15.5 5l-7 7 7 7 1.5-1.5L11.5 12 17 6.5 15.5 5z",
-            "forward" => "M8.5 5l7 7-7 7L7 17.5 12.5 12 7 6.5 8.5 5z",
-            "close" => "M6.4 5L5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6 6.4 5z",
-            "minus" => "M5 11h14v2H5v-2z",
-            "maximize" => "M6 6h12v12H6V6z M8 8v8h8V8H8z",
-            "restore" => "M7 7h10v3h-2V9H9v6h1v2H7V7z M11 11h8v8h-8v-8z M13 13v4h4v-4h-4z",
-            "star" => "M12 2l2.9 6.2 6.8.8-5 4.7 1.3 6.7-6-3.4-6 3.4 1.3-6.7-5-4.7 6.8-.8L12 2z",
-            "delete" => "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12z M19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
-            "play" => "M8 5v14l11-7L8 5z",
-            "pause" => "M6 5h4v14H6V5z M14 5h4v14h-4V5z",
-            "prev" => "M6 6h2v12H6V6z M20 6v12l-9-6 9-6z",
-            "next" => "M16 6h2v12h-2V6z M4 6l9 6-9 6V6z",
-            "music" => "M9 3v10.6a4 4 0 1 0 2 3.4V7h8V3H9z",
-            "nav-home" => "M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
-            "nav-projects" => "M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z",
-            "nav-tasks" => "M9 16.2l-3.5-3.5L4 14.2l5 5 11-11-1.4-1.4L9 16.2z",
-            "nav-notes" => "M4 4h12l4 4v12H4V4z M15 5v4h4 M7 12h10v2H7v-2z M7 15h7v2H7v-2z",
-            "nav-connections" => "M3.9 12c0-1.7 1.3-3 3-3h2V7H6.9C4.8 7 3 8.8 3 10.9V12H1v2h2v1.1C3 17.2 4.8 19 6.9 19H9v-2H6.9c-1.7 0-3-1.3-3-3V12z M21 10.9C21 8.8 19.2 7 17.1 7H15v2h2.1c1.7 0 3 1.3 3 3V14h2v-1.1z M12 8l-4 4 4 4 4-4-4-4z",
-            "nav-contacts" => "M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
-            "nav-browser" => "M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1 17.9C7.1 18.4 4 15.5 4 12c0-1.6.5-3.1 1.3-4.4L11 14v5.9zm6.9-2.5C16.9 16.9 14.5 18 12 18v-6l5.7-5.7c.8 1.3 1.3 2.8 1.3 4.4 0 1.8-.6 3.4-1.4 4.7z",
-            "nav-commands" => "M8 5v14l11-7L8 5z M4 6h3v12H4V6z M17 6h3v12h-3V6z",
-            "nav-backup" => "M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2z M13 12.7l2.6-2.6 1.4 1.4L12 17 6 11l1.4-1.4 2.6 2.6V4h2v8.7z",
-            "nav-dropzone" => "M12 2l6 8a6 6 0 1 1-12 0l6-8z",
-            "nav-settings" => "M19.4 13a7.5 7.5 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 2h-4l-.3 2.4a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.5 7.5 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1L11 22h4l.3-2.4a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6z M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z",
-            _ => "M4 4h16v16H4V4z"
-        };
-        var path = new System.Windows.Shapes.Path
-        {
-            Data = System.Windows.Media.Geometry.Parse(geometry),
-            Fill = (WpfBrush)FindResource("TextBrush"),
-            Stretch = Stretch.Uniform,
-            Width = size,
-            Height = size
-        };
-        return path;
+        return UiIconFactory.Create(iconName, size);
     }
 
     private WpfTextBox SearchBox(string hint, Action render) => UiHelpers.CreateSearchBox(hint, render);

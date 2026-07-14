@@ -346,7 +346,7 @@ public partial class MainWindow
 
         layout.Children.Add(EditIconButton(() => EditCommandRecipe(recipe)));
 
-        stack.Children.Add(Text(recipe.Command, 14, WpfBrushes.WhiteSmoke, new Thickness(0, 6, 0, 14)));
+        stack.Children.Add(Text(recipe.Command, 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 6, 0, 14)));
 
         var variables = ExtractVariables(recipe.Command).ToList();
 

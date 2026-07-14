@@ -36,6 +36,7 @@ public static class ConnectionService
             return "RDP адрес пуст.";
         }
 
+        var target = port == 3389 ? host : $"{host}:{port}";
         var login = connection.Login.Trim();
         var password = SecretService.Unprotect(connection.EncryptedPassword);
 
@@ -45,21 +46,21 @@ public static class ConnectionService
 
             if (!string.IsNullOrWhiteSpace(login) && !string.IsNullOrWhiteSpace(password))
             {
-                SaveRdpCredentials(host, login, password);
-                RdpHelper.WriteRdpFileWithoutPassword(rdpPath, host, port, login);
+                SaveRdpCredentials(target, login, password);
+                RdpHelper.WriteRdpFileWithoutPassword(rdpPath, target, 3389, login);
                 LaunchMstsc(rdpPath);
-                return $"RDP: {host}:{port} ({login})";
+                return $"RDP credentials saved to Windows Credential Manager for TERMSRV/{target}. RDP запущен ({login}).";
             }
 
             if (!string.IsNullOrWhiteSpace(login))
             {
-                RdpHelper.WriteRdpFileWithoutPassword(rdpPath, host, port, login);
+                RdpHelper.WriteRdpFileWithoutPassword(rdpPath, target, 3389, login);
                 LaunchMstsc(rdpPath);
-                return $"RDP: {host}:{port} ({login}, без пароля)";
+                return $"RDP запущен для {target} ({login}, без пароля).";
             }
 
-            LaunchMstsc($"/v:{host}:{port}");
-            return $"Запущен mstsc для {host}:{port}.";
+            LaunchMstsc($"/v:{target}");
+            return $"Запущен mstsc для {target}.";
         }
         catch (Exception ex)
         {
@@ -92,21 +93,22 @@ public static class ConnectionService
             return "RDP адрес пуст.";
         }
 
-        var (host, _) = RdpHelper.ParseAddress(address);
+        var (host, port) = RdpHelper.ParseAddress(address);
+        var target = port == 3389 ? host : $"{host}:{port}";
         RdpHelper.DeleteRdpFile(connection.Id);
 
-        var result = RunCmdKey($"/delete:TERMSRV/{host}");
+        var result = RunCmdKey($"/delete:TERMSRV/{target}");
         return result.ExitCode == 0
-            ? $"Удалены RDP-данные для TERMSRV/{host}."
-            : $"Не удалось удалить RDP-данные для TERMSRV/{host}: {result.Output}";
+            ? $"Удалены RDP-данные для TERMSRV/{target}."
+            : $"Не удалось удалить RDP-данные для TERMSRV/{target}: {result.Output}";
     }
 
-    private static void SaveRdpCredentials(string host, string login, string password)
+    private static void SaveRdpCredentials(string target, string login, string password)
     {
-        var result = RunCmdKey($"/generic:TERMSRV/{host} /user:{QuoteCmdKey(login)} /pass:{QuoteCmdKey(password)}");
+        var result = RunCmdKey($"/generic:TERMSRV/{target}", $"/user:{login}", $"/pass:{password}");
         if (result.ExitCode != 0)
         {
-            throw new InvalidOperationException($"cmdkey failed for TERMSRV/{host}: {result.Output}");
+            throw new InvalidOperationException($"cmdkey failed for TERMSRV/{target}: {result.Output}");
         }
     }
 
@@ -148,28 +150,26 @@ public static class ConnectionService
         }
     }
 
-    private static (int ExitCode, string Output) RunCmdKey(string arguments)
+    private static (int ExitCode, string Output) RunCmdKey(params string[] arguments)
     {
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
             FileName = "cmdkey.exe",
-            Arguments = arguments,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
         process.Start();
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
         return (process.ExitCode, string.Join(" ", new[] { output, error }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim());
-    }
-
-    private static string QuoteCmdKey(string value)
-    {
-        return "\"" + value.Replace("\"", "\\\"") + "\"";
     }
 
     private static void TryEnableAnyDeskAutoLoginAsync()

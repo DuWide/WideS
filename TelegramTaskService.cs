@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 
 namespace DevCockpit;
@@ -63,6 +64,143 @@ public sealed class TelegramTaskService
         {
             return new TelegramPollResult { Success = false, Error = ex.Message };
         }
+    }
+
+    public async Task<TelegramPollResult> ImportDesktopExportAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return new TelegramPollResult { Success = false, Error = "Не выбран result.json из Telegram Desktop." };
+        }
+
+        if (!File.Exists(path))
+        {
+            return new TelegramPollResult { Success = false, Error = $"Файл экспорта не найден: {path}" };
+        }
+
+        try
+        {
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var tasks = new List<TelegramIncomingTask>();
+            ReadDesktopExport(doc.RootElement, tasks);
+            return new TelegramPollResult { Success = true, Tasks = tasks };
+        }
+        catch (JsonException ex)
+        {
+            return new TelegramPollResult { Success = false, Error = $"Некорректный JSON экспорта: {ex.Message}" };
+        }
+        catch (Exception ex)
+        {
+            return new TelegramPollResult { Success = false, Error = ex.Message };
+        }
+    }
+
+    private static void ReadDesktopExport(JsonElement root, List<TelegramIncomingTask> tasks)
+    {
+        if (root.ValueKind != JsonValueKind.Object) return;
+
+        if (root.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
+        {
+            ReadDesktopChat(root, "chat", tasks);
+        }
+
+        if (root.TryGetProperty("chats", out var chats) &&
+            chats.ValueKind == JsonValueKind.Object &&
+            chats.TryGetProperty("list", out var list) &&
+            list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var chat in list.EnumerateArray())
+            {
+                ReadDesktopChat(chat, "chat", tasks);
+            }
+        }
+    }
+
+    private static void ReadDesktopChat(
+        JsonElement chat,
+        string fallbackChatKey,
+        List<TelegramIncomingTask> tasks)
+    {
+        if (chat.ValueKind != JsonValueKind.Object ||
+            !chat.TryGetProperty("messages", out var messages) ||
+            messages.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var chatKey = ReadScalar(chat, "id");
+        if (string.IsNullOrWhiteSpace(chatKey)) chatKey = ReadScalar(chat, "name");
+        if (string.IsNullOrWhiteSpace(chatKey)) chatKey = fallbackChatKey;
+
+        foreach (var message in messages.EnumerateArray())
+        {
+            if (message.ValueKind != JsonValueKind.Object) continue;
+            if (message.TryGetProperty("type", out var type) &&
+                type.ValueKind == JsonValueKind.String &&
+                !string.Equals(type.GetString(), "message", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!message.TryGetProperty("text", out var textElement)) continue;
+            var text = ExtractDesktopText(textElement);
+            var parsed = TelegramTaskParser.TryParse(text);
+            if (parsed is null) continue;
+
+            var messageKey = ReadScalar(message, "id");
+            if (string.IsNullOrWhiteSpace(messageKey))
+            {
+                messageKey = ReadScalar(message, "date_unixtime");
+            }
+            if (string.IsNullOrWhiteSpace(messageKey))
+            {
+                messageKey = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..16];
+            }
+
+            tasks.Add(new TelegramIncomingTask
+            {
+                TelegramKey = $"desktop:{chatKey}:{messageKey}",
+                Parsed = parsed
+            });
+        }
+    }
+
+    private static string ExtractDesktopText(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String) return element.GetString() ?? "";
+        if (element.ValueKind != JsonValueKind.Array) return "";
+
+        var builder = new StringBuilder();
+        foreach (var part in element.EnumerateArray())
+        {
+            if (part.ValueKind == JsonValueKind.String)
+            {
+                builder.Append(part.GetString());
+                continue;
+            }
+
+            if (part.ValueKind == JsonValueKind.Object &&
+                part.TryGetProperty("text", out var nestedText) &&
+                nestedText.ValueKind == JsonValueKind.String)
+            {
+                builder.Append(nestedText.GetString());
+            }
+        }
+        return builder.ToString();
+    }
+
+    private static string ReadScalar(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value)) return "";
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString() ?? "",
+            JsonValueKind.Number => value.GetRawText(),
+            _ => ""
+        };
     }
 
     private static TelegramPollResult ParseUpdates(string json, long previousLastUpdateId)

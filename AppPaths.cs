@@ -6,9 +6,16 @@ public static class AppPaths
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "DevCockpit");
 
-    public static string DataDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "WideS");
+    public static string DataDirectory
+    {
+        get
+        {
+            var overridePath = Environment.GetEnvironmentVariable("WIDES_DATA_DIR");
+            return string.IsNullOrWhiteSpace(overridePath)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WideS")
+                : Path.GetFullPath(overridePath);
+        }
+    }
 
     public static string LegacyDataDirectory => Path.Combine(AppContext.BaseDirectory, "data");
     public static string ProjectsJson => Path.Combine(DataDirectory, "projects.json");
@@ -20,6 +27,8 @@ public static class AppPaths
     public static string TasksJson => Path.Combine(DataDirectory, "tasks.json");
     public static string ActivityJson => Path.Combine(DataDirectory, "activity.json");
     public static string ProjectTemplatesJson => Path.Combine(DataDirectory, "project-templates.json");
+    public static string ClipboardHistoryJson => Path.Combine(DataDirectory, "clipboard-history.json");
+    public static string ClipboardImagesDirectory => Path.Combine(DataDirectory, "clipboard-images");
 
     public static void EnsureDataDirectory()
     {
@@ -34,6 +43,8 @@ public static class AppPaths
         MigrateIfMissing("tasks.json");
         MigrateIfMissing("activity.json");
         MigrateIfMissing("project-templates.json");
+        MigrateIfMissing("clipboard-history.json");
+        Directory.CreateDirectory(ClipboardImagesDirectory);
     }
 
     private static void MigrateFromLegacyAppData()
@@ -76,7 +87,7 @@ public static class AppPaths
     public static string EnsureTodayWorkDay(ProjectProfile project)
     {
         var day = TodayWorkDay(project);
-        foreach (var name in new[] { "Context", "Backups", "Releases" })
+        foreach (var name in new[] { "Screens", "Screenshots", "Errors", "Temp", "Context", "Backups", "Releases" })
         {
             Directory.CreateDirectory(Path.Combine(day, name));
         }

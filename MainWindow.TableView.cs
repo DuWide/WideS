@@ -27,7 +27,7 @@ public partial class MainWindow
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6, 6, 0, 0),
-            Padding = new Thickness(10, 6, 8, 6),
+            Padding = new Thickness(12, 7, 10, 7),
             Margin = new Thickness(0)
         };
 
@@ -53,8 +53,8 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("CardBrush"),
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1, 0, 1, 1),
-            Padding = new Thickness(8, 4, 6, 4),
-            MinHeight = 34,
+            Padding = new Thickness(10, 5, 8, 5),
+            MinHeight = 36,
             Cursor = click is null ? System.Windows.Input.Cursors.Arrow : System.Windows.Input.Cursors.Hand,
             Child = grid
         };

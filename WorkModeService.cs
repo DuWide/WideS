@@ -14,9 +14,9 @@ public static class WorkModeService
 
     public static IReadOnlyList<(string Label, string Value)> ModeOptions() =>
     [
-        ("Работа", Work),
+        ("Стандартный", Work),
         ("Фокус", Focus),
-        ("Досуг", Leisure)
+        ("Личный", Leisure)
     ];
 
     public static IReadOnlyList<(string Label, string Key)> HomeQuickActions(string mode)
@@ -59,22 +59,22 @@ public static class WorkModeService
     public static string DisplayName(string mode) => mode switch
     {
         Focus => "Фокус",
-        Leisure => "Досуг",
-        _ => "Работа"
+        Leisure => "Личный",
+        _ => "Стандартный"
     };
 
     public static string DescribeEffects(string mode)
     {
         if (mode.Equals(Focus, StringComparison.OrdinalIgnoreCase))
         {
-            return "Режим: Фокус — только задача, заметка, проект и Cursor; медиа и backup скрыты.";
+            return "Фокус: задача, заметка, проект и Cursor без второстепенных действий.";
         }
 
         if (mode.Equals(Leisure, StringComparison.OrdinalIgnoreCase))
         {
-            return "Режим: Досуг — заметка, браузер, DropZone и Dock; минимум рабочих кнопок.";
+            return "Личный: заметки, браузер, DropZone и медиапанель.";
         }
 
-        return "Режим: Работа — все быстрые действия и медиа-панель доступны.";
+        return "Стандартный: доступны все разделы, быстрые действия и медиапанель.";
     }
 }

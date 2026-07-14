@@ -9,7 +9,8 @@ public partial class App : System.Windows.Application
         TaskNotificationService.Initialize();
         TaskNotificationService.RegisterApp();
 
-        if (!SingleInstanceService.TryAcquire())
+        var smokeMode = Environment.GetEnvironmentVariable("WIDES_SMOKE") == "1";
+        if (!smokeMode && !SingleInstanceService.TryAcquire())
         {
             SingleInstanceService.NotifyExistingInstance();
             Shutdown();
@@ -32,6 +33,8 @@ public partial class App : System.Windows.Application
         var settingsAlreadyExisted = System.IO.File.Exists(AppPaths.SettingsJson);
         var settingsStore = new JsonFileStore<AppSettingsData>(AppPaths.SettingsJson);
         var settings = settingsStore.Load();
+        var smokeTheme = Environment.GetEnvironmentVariable("WIDES_THEME");
+        ThemeService.Apply(string.IsNullOrWhiteSpace(smokeTheme) ? settings.AccentTheme : smokeTheme);
         if (settingsAlreadyExisted && !settings.IsFirstRunConfigured)
         {
             settings.IsFirstRunConfigured = true;
@@ -61,7 +64,7 @@ public partial class App : System.Windows.Application
         }
 
         if (!justConfigured && !settings.DisableLogin &&
-            Environment.GetEnvironmentVariable("WIDES_SMOKE") != "1")
+            !smokeMode)
         {
             var login = new LoginWindow(settings);
             if (login.ShowDialog() != true)
@@ -72,7 +75,7 @@ public partial class App : System.Windows.Application
         }
 
         var userName = string.IsNullOrWhiteSpace(settings.UserName) ? "Олег" : settings.UserName.Trim();
-        if (Environment.GetEnvironmentVariable("WIDES_SMOKE") != "1" &&
+        if (!settings.DisableLogin && !smokeMode &&
             new WelcomeWindow(userName).ShowDialog() != true)
         {
             Shutdown();

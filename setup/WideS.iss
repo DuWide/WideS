@@ -1,5 +1,5 @@
 #define MyAppName "WideS"
-#define MyAppVersion "1.2.8"
+#define MyAppVersion "1.5.6"
 #define MyAppPublisher "WideS"
 #define MyAppExeName "WideS.exe"
 #define MyAppSource "WideS-Setup\app"
@@ -31,10 +31,11 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 
 [Files]
 Source: "{#MyAppSource}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\Assets\WideS.ico"; DestDir: "{app}"; DestName: "WideS-{#MyAppVersion}.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\WideS-{#MyAppVersion}.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\WideS-{#MyAppVersion}.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; Flags: nowait postinstall skipifsilent

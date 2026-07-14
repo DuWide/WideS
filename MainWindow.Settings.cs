@@ -116,10 +116,20 @@ public partial class MainWindow
             Foreground = (WpfBrush)FindResource("TextBrush")
         };
         hotkeysStack.Children.Add(clipboardScreenshotCheck);
+        var clipboardHistoryCheck = new System.Windows.Controls.CheckBox
+        {
+            Content = "Вести локальную историю буфера",
+            IsChecked = _settings.ClipboardHistoryEnabled,
+            Margin = new Thickness(0, 4, 0, 4),
+            Foreground = (WpfBrush)FindResource("TextBrush")
+        };
+        hotkeysStack.Children.Add(clipboardHistoryCheck);
+        hotkeysStack.Children.Add(Muted("Текст хранится через DPAPI; потенциальные пароли скрываются в превью."));
         hotkeysStack.Children.Add(Muted("Если при RDP не работает копирование/вставка — снимите галочку и сохраните."));
         hotkeysStack.Children.Add(ActionButton("Сохранить буфер", () =>
         {
             _settings.ClipboardScreenshotPrompt = clipboardScreenshotCheck.IsChecked == true;
+            _settings.ClipboardHistoryEnabled = clipboardHistoryCheck.IsChecked == true;
             _settingsStore.Save(_settings);
             UpdateClipboardScreenshotListener();
             AddLog("OK", "Настройка буфера обмена сохранена.");
@@ -130,45 +140,38 @@ public partial class MainWindow
         var appearance = Card("Внешний вид");
         appearance.Width = 720;
         var appearanceStack = BaseCardStack("Внешний вид");
-        appearanceStack.Children.Add(Muted("Тема оформления"));
-        var accentBox = UiHelpers.CreateToolbarComboBox(220);
-        foreach (var preset in ThemeService.Presets)
-        {
-            accentBox.Items.Add(new { preset.DisplayName, preset.Id });
-        }
-        accentBox.DisplayMemberPath = "DisplayName";
-        accentBox.SelectedValuePath = "Id";
-        accentBox.SelectedValue = ThemeService.NormalizePresetId(_settings.AccentTheme);
+        appearanceStack.Children.Add(Muted("Тема интерфейса"));
+        var accentBox = UiHelpers.CreateToolbarComboBox(320);
+        foreach (var preset in ThemeService.Presets) accentBox.Items.Add(preset);
+        accentBox.SelectedItem = ThemeService.GetPreset(_settings.AccentTheme);
         accentBox.SelectionChanged += (_, _) =>
         {
-            if (accentBox.SelectedValue is string value)
+            if (accentBox.SelectedItem is ThemeService.ThemePreset preset)
             {
-                ApplyTheme(value);
+                ApplyTheme(preset.Id);
             }
         };
         appearanceStack.Children.Add(accentBox);
-        var compactSidebarCheck = new System.Windows.Controls.CheckBox { Content = "Компактный sidebar", IsChecked = _settings.CompactSidebar, Margin = new Thickness(0, 4, 0, 8) };
+        var compactSidebarCheck = new System.Windows.Controls.CheckBox { Content = "Компактная боковая панель", IsChecked = _settings.CompactSidebar, Margin = new Thickness(0, 8, 0, 12) };
         appearanceStack.Children.Add(compactSidebarCheck);
-        appearanceStack.Children.Add(Muted("Режим работы"));
-        var modeBox = UiHelpers.CreateToolbarComboBox(220);
+        appearanceStack.Children.Add(Muted("Режим интерфейса"));
+        var modeBox = UiHelpers.CreateToolbarComboBox(320);
         foreach (var option in WorkModeService.ModeOptions())
         {
-            modeBox.Items.Add(new { option.Label, option.Value });
+            modeBox.Items.Add(new SelectOption(option.Label, option.Value));
         }
-        modeBox.DisplayMemberPath = "Label";
-        modeBox.SelectedValuePath = "Value";
-        modeBox.SelectedValue = _settings.WorkMode;
+        modeBox.SelectedItem = modeBox.Items.OfType<SelectOption>().FirstOrDefault(x => x.Value == _settings.WorkMode) ?? modeBox.Items[0];
         appearanceStack.Children.Add(modeBox);
         var modeHint = Muted(WorkModeService.DescribeEffects(_settings.WorkMode));
         modeBox.SelectionChanged += (_, _) =>
         {
-            if (modeBox.SelectedValue is string value) modeHint.Text = WorkModeService.DescribeEffects(value);
+            if (modeBox.SelectedItem is SelectOption option) modeHint.Text = WorkModeService.DescribeEffects(option.Value);
         };
         appearanceStack.Children.Add(modeHint);
-        appearanceStack.Children.Add(ActionButton("Сохранить вид", () =>
+        appearanceStack.Children.Add(ActionButton("Применить оформление", () =>
         {
-            _settings.AccentTheme = accentBox.SelectedValue?.ToString() ?? "Ocean";
-            _settings.WorkMode = modeBox.SelectedValue?.ToString() ?? "Work";
+            _settings.AccentTheme = (accentBox.SelectedItem as ThemeService.ThemePreset)?.Id ?? "Dark";
+            _settings.WorkMode = (modeBox.SelectedItem as SelectOption)?.Value ?? "Work";
             _settings.CompactSidebar = compactSidebarCheck.IsChecked == true;
             _settingsStore.Save(_settings);
             ApplyTheme(_settings.AccentTheme);
@@ -215,20 +218,60 @@ public partial class MainWindow
         startupCard.Child = startupStack;
         panel.Children.Add(startupCard);
 
-        var telegramCard = Card("Telegram задачи");
+        var telegramCard = Card("Telegram");
         telegramCard.Width = 720;
-        var telegramStack = BaseCardStack("Telegram задачи");
-        telegramStack.Children.Add(Muted("Авто-импорт задач из бота. Импортируются только сообщения со статусом «В работе»."));
+        var telegramStack = BaseCardStack("Telegram");
+        telegramStack.Children.Add(Muted("Импорт задач со статусом «В работе». Режим экспорта Telegram Desktop работает без bot token."));
         var telegramEnabled = new System.Windows.Controls.CheckBox
         {
-            Content = "Включить авто-импорт из Telegram",
+            Content = "Следить за обновлением источника",
             IsChecked = _settings.TelegramEnabled,
             Foreground = (WpfBrush)FindResource("TextBrush"),
             Margin = new Thickness(0, 4, 0, 8)
         };
         telegramStack.Children.Add(telegramEnabled);
-        telegramStack.Children.Add(Muted("Bot Token от BotFather"));
-        var telegramToken = new PasswordBox
+
+        telegramStack.Children.Add(Muted("Источник задач"));
+        var telegramSource = UiHelpers.CreateToolbarComboBox(360);
+        telegramSource.Items.Add(new SelectOption("Экспорт Telegram Desktop — без токена", "DesktopExport"));
+        telegramSource.Items.Add(new SelectOption("Telegram Bot API", "BotApi"));
+        telegramSource.SelectedItem = telegramSource.Items.OfType<SelectOption>()
+            .FirstOrDefault(x => x.Value.Equals(_settings.TelegramSource, StringComparison.OrdinalIgnoreCase))
+            ?? telegramSource.Items[0];
+        telegramStack.Children.Add(telegramSource);
+        PasswordBox telegramToken = null!;
+
+        var desktopSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        desktopSection.Children.Add(Muted("Файл result.json из Telegram Desktop → Настройки → Продвинутые → Экспорт данных."));
+        var telegramPath = new WpfTextBox
+        {
+            Text = _settings.TelegramDesktopExportPath,
+            Margin = new Thickness(0, 8, 0, 8),
+            MinWidth = 520
+        };
+        desktopSection.Children.Add(telegramPath);
+        var desktopButtons = new WrapPanel();
+        desktopButtons.Children.Add(ActionButton("Выбрать result.json", () =>
+        {
+            using var dialog = new Forms.OpenFileDialog
+            {
+                Filter = "Экспорт Telegram (result.json)|result.json|JSON-файлы|*.json",
+                CheckFileExists = true
+            };
+            if (dialog.ShowDialog() == Forms.DialogResult.OK) telegramPath.Text = dialog.FileName;
+        }, false));
+        desktopButtons.Children.Add(ActionButton("Проверить и импортировать", async () =>
+        {
+            SaveTelegramSettings();
+            await PollTelegramTasksAsync(force: true, showSummary: true);
+        }, false));
+        desktopSection.Children.Add(desktopButtons);
+        desktopSection.Children.Add(Muted("WideS не читает закрытую папку tdata. После нового экспорта обновите result.json; дубли не создаются."));
+        telegramStack.Children.Add(desktopSection);
+
+        var botSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        botSection.Children.Add(Muted("Bot Token от BotFather"));
+        telegramToken = new PasswordBox
         {
             Margin = new Thickness(0, 8, 0, 8),
             MinWidth = 520,
@@ -240,30 +283,42 @@ public partial class MainWindow
         {
             telegramToken.Password = "********";
         }
-        telegramStack.Children.Add(telegramToken);
-        telegramStack.Children.Add(Muted($"Ожидаемый Bot ID: {_settings.TelegramBotId}"));
-        var telegramButtons = new WrapPanel();
-        telegramButtons.Children.Add(ActionButton("Сохранить Telegram", () =>
+        botSection.Children.Add(telegramToken);
+        botSection.Children.Add(Muted($"Ожидаемый Bot ID: {_settings.TelegramBotId}"));
+        botSection.Children.Add(ActionButton("Проверить Bot API", async () =>
         {
-            _settings.TelegramEnabled = telegramEnabled.IsChecked == true;
-            if (!string.IsNullOrWhiteSpace(telegramToken.Password) && telegramToken.Password != "********")
-            {
-                _settings.TelegramBotTokenEncrypted = SecretService.Protect(telegramToken.Password.Trim());
-            }
-            _settingsStore.Save(_settings);
-            RestartTelegramPolling();
-            AddLog("OK", "Настройки Telegram сохранены.");
+            SaveTelegramSettings();
+            await PollTelegramTasksAsync(force: true, showSummary: true);
         }, false));
-        telegramButtons.Children.Add(ActionButton("Проверить сейчас", () =>
+        telegramStack.Children.Add(botSection);
+
+        void SaveTelegramSettings()
         {
+            _settings.TelegramEnabled = telegramEnabled.IsChecked == true;
+            _settings.TelegramSource = (telegramSource.SelectedItem as SelectOption)?.Value ?? "DesktopExport";
+            _settings.TelegramDesktopExportPath = telegramPath.Text.Trim();
             if (!string.IsNullOrWhiteSpace(telegramToken.Password) && telegramToken.Password != "********")
             {
                 _settings.TelegramBotTokenEncrypted = SecretService.Protect(telegramToken.Password.Trim());
             }
-            _settings.TelegramEnabled = telegramEnabled.IsChecked == true;
             _settingsStore.Save(_settings);
             RestartTelegramPolling();
-            _ = PollTelegramTasksAsync();
+        }
+
+        void UpdateTelegramSourceVisibility()
+        {
+            var desktop = (telegramSource.SelectedItem as SelectOption)?.Value != "BotApi";
+            desktopSection.Visibility = desktop ? Visibility.Visible : Visibility.Collapsed;
+            botSection.Visibility = desktop ? Visibility.Collapsed : Visibility.Visible;
+        }
+        telegramSource.SelectionChanged += (_, _) => UpdateTelegramSourceVisibility();
+        UpdateTelegramSourceVisibility();
+
+        var telegramButtons = new WrapPanel();
+        telegramButtons.Children.Add(ActionButton("Сохранить настройки", () =>
+        {
+            SaveTelegramSettings();
+            AddLog("OK", "Настройки Telegram сохранены.");
         }, false));
         telegramStack.Children.Add(telegramButtons);
         telegramCard.Child = telegramStack;

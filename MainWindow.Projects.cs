@@ -59,7 +59,7 @@ public partial class MainWindow
         SetTitle(project.Name, "Заметки, задачи, подключения и инструменты проекта");
         var root = new DockPanel();
 
-        var top = new WrapPanel { Margin = new Thickness(8) };
+        var top = new WrapPanel();
         top.Children.Add(ActionButton("Рабочая область", () => StartFocusProject(project)));
         top.Children.Add(ActionButton("Открыть папку", OpenSelectedFolder));
         top.Children.Add(ActionButton("Cursor", OpenWorkspace, false));
@@ -67,8 +67,9 @@ public partial class MainWindow
         top.Children.Add(ActionButton("Удалить с диска", () => DeleteProjectFromDisk(project), false));
         top.Children.Add(ToolbarGap());
         AddViewModeButtons(top, () => ShowProjectDetail(project));
-        DockPanel.SetDock(top, Dock.Top);
-        root.Children.Add(top);
+        var topShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = top };
+        DockPanel.SetDock(topShell, Dock.Top);
+        root.Children.Add(topShell);
 
         var pathRow = new Border
         {
@@ -126,9 +127,9 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("PanelBrush"),
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(18),
-            Margin = new Thickness(8),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16),
+            Margin = new Thickness(6),
             Width = IsListView(_viewScope) ? 760 : 700,
             MinHeight = 150
         };
@@ -180,9 +181,9 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("PanelBrush"),
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(18),
-            Margin = new Thickness(8),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16),
+            Margin = new Thickness(6),
             Width = IsListView(_viewScope) ? 760 : 700,
             MinHeight = 150
         };
@@ -216,9 +217,9 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("PanelBrush"),
             BorderBrush = ThemeBorderMain(),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(18),
-            Margin = new Thickness(8),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16),
+            Margin = new Thickness(6),
             Width = IsListView(_viewScope) ? 760 : 340,
             MinHeight = 150
         };
@@ -498,10 +499,11 @@ public partial class MainWindow
         layout.Children.Add(stack);
         layout.Children.Add(EditIconButton(() => EditProject(project)));
         layout.Children.Add(FavoriteIconButton(project.IsPinned, () => ToggleProjectPinned(project), 34));
+        layout.Children.Add(ProjectMoreButton(project));
         stack.Children.Add(Muted(project.ProjectFolder));
         stack.Children.Add(UiHelpers.TypeBadge(UiHelpers.ProjectStatusDisplay(project.Status)));
         stack.Children.Add(Muted($"Открывал: {UiHelpers.RelativeDays(project.LastOpenedAt)}"));
-        if (!string.IsNullOrWhiteSpace(project.Comment)) stack.Children.Add(Text(project.Comment, 14, WpfBrushes.WhiteSmoke, new Thickness(0, 12, 0, 8)));
+        if (!string.IsNullOrWhiteSpace(project.Comment)) stack.Children.Add(Text(project.Comment, 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 12, 0, 8)));
         var projectNotes = _notes.Notes.Count(n => n.WorkspaceId == project.Id);
         stack.Children.Add(Muted($"Заметок проекта: {projectNotes}"));
         var primary = new WrapPanel { Margin = new Thickness(0, 12, 0, 4) };
@@ -510,23 +512,45 @@ public partial class MainWindow
         primary.Children.Add(ActionButton("Cursor", () => { _selectedProject = project; OpenWorkspace(); }, false));
         stack.Children.Add(primary);
 
-        var secondary = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
-        secondary.Children.Add(LinkAction(project.IsPinned ? "Закреплено" : "Закрепить", () => ToggleProjectPinned(project)));
-        if (!project.Status.Equals("Active", StringComparison.OrdinalIgnoreCase))
-            secondary.Children.Add(LinkAction("Активен", () => SetProjectStatus(project, "Active")));
-        if (!project.Status.Equals("Paused", StringComparison.OrdinalIgnoreCase))
-            secondary.Children.Add(LinkAction("На паузу", () => SetProjectStatus(project, "Paused")));
-        if (!project.Status.Equals("Archive", StringComparison.OrdinalIgnoreCase))
-            secondary.Children.Add(LinkAction("В архив", () => SetProjectStatus(project, "Archive")));
-        secondary.Children.Add(LinkAction("Backup", () => { _selectedProject = project; BackupSelected(); }));
-        secondary.Children.Add(LinkAction("Скопировать в AI", () => { _selectedProject = project; CopyForAiSelected(); }));
-        secondary.Children.Add(LinkAction("Папка дня", () => { _selectedProject = project; OpenWorkday(); }));
-        secondary.Children.Add(LinkAction("Шаблон", () => ApplyProjectTemplate(project)));
-        secondary.Children.Add(LinkAction("Удалить проект", () => DeleteProject(project)));
-        secondary.Children.Add(LinkAction("Удалить с диска", () => DeleteProjectFromDisk(project)));
-        stack.Children.Add(secondary);
         card.Child = layout;
         return card;
+    }
+
+    private WpfButton ProjectMoreButton(ProjectProfile project)
+    {
+        var menu = new ContextMenu();
+        void AddItem(string title, Action action)
+        {
+            var item = new MenuItem { Header = title };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+        }
+
+        AddItem(project.IsPinned ? "Убрать из избранного" : "Добавить в избранное", () => ToggleProjectPinned(project));
+        menu.Items.Add(new Separator());
+        if (!project.Status.Equals("Active", StringComparison.OrdinalIgnoreCase)) AddItem("Сделать активным", () => SetProjectStatus(project, "Active"));
+        if (!project.Status.Equals("Paused", StringComparison.OrdinalIgnoreCase)) AddItem("Поставить на паузу", () => SetProjectStatus(project, "Paused"));
+        if (!project.Status.Equals("Archive", StringComparison.OrdinalIgnoreCase)) AddItem("Переместить в архив", () => SetProjectStatus(project, "Archive"));
+        menu.Items.Add(new Separator());
+        AddItem("Создать Backup", () => { _selectedProject = project; BackupSelected(); });
+        AddItem("Скопировать в AI", () => { _selectedProject = project; CopyForAiSelected(); });
+        AddItem("Открыть папку дня", () => { _selectedProject = project; OpenWorkday(); });
+        AddItem("Применить шаблон", () => ApplyProjectTemplate(project));
+        menu.Items.Add(new Separator());
+        AddItem("Удалить из WideS", () => DeleteProject(project));
+        AddItem("Удалить с диска", () => DeleteProjectFromDisk(project));
+
+        WpfButton? button = null;
+        button = IconButton("more", () =>
+        {
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }, "Другие действия", 28);
+        button.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
+        button.VerticalAlignment = VerticalAlignment.Top;
+        button.Margin = new Thickness(0, 0, 68, 0);
+        return button;
     }
 
     private Border ProjectTableHeader() => BuildTableHeader(

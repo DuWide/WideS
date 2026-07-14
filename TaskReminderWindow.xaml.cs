@@ -14,6 +14,7 @@ public partial class TaskReminderWindow : Window
         DescriptionText.Text = task.Description;
         SnoozeList.Items.Add("15 минут");
         SnoozeList.Items.Add("На час");
+        SnoozeList.Items.Add("На 6 часов");
         SnoozeList.Items.Add("На день");
         SnoozeList.Items.Add("На неделю");
         SnoozeList.SelectedIndex = 0;
@@ -36,15 +37,16 @@ public partial class TaskReminderWindow : Window
         if (SnoozeList.Visibility != Visibility.Visible)
         {
             SnoozeList.Visibility = Visibility.Visible;
-            Height = 360;
+            Height = 400;
             return;
         }
 
         Snooze = SnoozeList.SelectedIndex switch
         {
             1 => TimeSpan.FromHours(1),
-            2 => TimeSpan.FromDays(1),
-            3 => TimeSpan.FromDays(7),
+            2 => TimeSpan.FromHours(6),
+            3 => TimeSpan.FromDays(1),
+            4 => TimeSpan.FromDays(7),
             _ => TimeSpan.FromMinutes(15)
         };
         Close();

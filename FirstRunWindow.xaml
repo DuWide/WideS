@@ -1,40 +1,59 @@
 <Window x:Class="DevCockpit.FirstRunWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="WideS"
         Icon="Assets/WideS.ico"
-        Width="520"
-        Height="390"
+        Width="560"
+        Height="470"
+        MinWidth="520"
+        MinHeight="440"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource AppBgBrush}"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResize"
+        Background="Transparent"
         KeyDown="Window_KeyDown">
-    <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="32" CornerRadius="0" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="True" />
-    </shell:WindowChrome.WindowChrome>
-    <Grid Margin="26" Background="{StaticResource AppBgBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-        <StackPanel>
-            <TextBlock Text="Первый запуск WideS" FontSize="28" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-            <TextBlock Text="Задайте имя для приветствия и пароль входа. Пароль можно оставить пустым." Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,8,0,20" />
-        </StackPanel>
-        <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,8,0,8">
-            <StackPanel>
-                <TextBlock Text="Имя пользователя" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                <TextBox x:Name="UserNameBox" Margin="0,0,0,14" />
-                <TextBlock Text="Пароль" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                <PasswordBox x:Name="PasswordBox" Padding="10" Margin="0,0,0,14" />
-                <TextBlock Text="Подтвердите пароль" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                <PasswordBox x:Name="ConfirmPasswordBox" Padding="10" />
-                <TextBlock x:Name="ErrorText" Foreground="{StaticResource DangerBrush}" Margin="0,10,0,0" />
-            </StackPanel>
-        </Border>
-        <WrapPanel Grid.Row="2" HorizontalAlignment="Right">
-            <Button Content="Продолжить" Style="{StaticResource PrimaryButton}" Click="Continue_Click" />
-        </WrapPanel>
-    </Grid>
+    <Border Style="{StaticResource DialogFrame}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="58" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Style="{StaticResource DialogHeader}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource DialogCloseButton}" Click="Close_Click">
+                        <Path Data="{StaticResource CloseIconGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" />
+                    </Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                        <Image Source="Assets/WideS.png" Width="20" Height="20" Margin="0,0,8,0" />
+                        <TextBlock Text="Первый запуск" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="28,22,28,16">
+                <StackPanel>
+                    <TextBlock Text="Настроим WideS" Style="{StaticResource PageTitleText}" />
+                    <TextBlock Text="Имя появится на экране приветствия. Пароль можно оставить пустым."
+                               Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,22" />
+
+                    <TextBlock Text="Имя пользователя" Style="{StaticResource FieldLabelText}" />
+                    <TextBox x:Name="UserNameBox" Margin="0,0,0,16" />
+                    <TextBlock Text="Пароль" Style="{StaticResource FieldLabelText}" />
+                    <PasswordBox x:Name="PasswordBox" Margin="0,0,0,16" />
+                    <TextBlock Text="Подтвердите пароль" Style="{StaticResource FieldLabelText}" />
+                    <PasswordBox x:Name="ConfirmPasswordBox" />
+                    <TextBlock x:Name="ErrorText" Foreground="{DynamicResource DangerBrush}" Margin="0,10,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Row="2" Style="{StaticResource DialogFooter}">
+                <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <Button Content="Продолжить" Style="{StaticResource PrimaryButton}" Click="Continue_Click" />
+                </WrapPanel>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

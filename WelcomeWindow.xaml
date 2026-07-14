@@ -3,32 +3,33 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="WideS"
         Icon="Assets/WideS.ico"
-        Width="580"
-        Height="390"
+        Width="520"
+        Height="340"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         KeyDown="Window_KeyDown">
-    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}"
+    <Border Style="{StaticResource DialogFrame}"
             MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-        <Grid Background="{StaticResource AppBgBrush}" Margin="24">
+        <Grid Background="{DynamicResource AppBgBrush}" Margin="28">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Image Source="Assets/WideS.png" Width="72" Height="72" Margin="0,0,0,16" />
+                <Image Source="Assets/WideS.png" Width="62" Height="62" Margin="0,0,0,16" />
                 <TextBlock x:Name="WelcomeText"
-                           FontSize="28"
+                           FontFamily="{StaticResource DisplayFont}"
+                           FontSize="26"
                            FontWeight="SemiBold"
-                           Foreground="{StaticResource TextBrush}"
+                           Foreground="{DynamicResource TextBrush}"
                            TextAlignment="Center"
                            TextWrapping="Wrap"
                            MaxWidth="500" />
                 <TextBlock Text="WideS готов к работе"
                            FontSize="14"
-                           Foreground="{StaticResource MutedBrush}"
+                           Foreground="{DynamicResource MutedBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,18" />
-                <Button Content="Продолжить" Style="{StaticResource PrimaryButton}" Background="#7B68EE" BorderBrush="#7B68EE" Width="180" Height="42" Click="Continue_Click" />
+                <Button Content="Продолжить" Style="{StaticResource PrimaryButton}" Width="170" Height="42" Click="Continue_Click" />
             </StackPanel>
         </Grid>
     </Border>

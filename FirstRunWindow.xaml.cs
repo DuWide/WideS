@@ -16,6 +16,11 @@ public partial class FirstRunWindow : Window
 
     private void Continue_Click(object sender, RoutedEventArgs e) => TryContinue();
 
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
+        EditorWindowHelper.TitleBar_MouseLeftButtonDown(this, e);
+
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Enter)

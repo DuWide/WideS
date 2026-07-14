@@ -6,6 +6,7 @@ public sealed class TaskNotificationAction
 {
     public Guid TaskId { get; init; }
     public string Action { get; init; } = "";
+    public int SnoozeMinutes { get; init; } = 15;
 }
 
 public static class TaskNotificationService
@@ -31,7 +32,16 @@ public static class TaskNotificationService
             }
 
             var action = args.TryGetValue("action", out var actionRaw) ? actionRaw : "open";
-            NotificationActivated?.Invoke(new TaskNotificationAction { TaskId = taskId, Action = action });
+            var snoozeMinutes = toastArgs.UserInput.TryGetValue("snoozeMinutes", out var snoozeRaw) &&
+                                 int.TryParse(Convert.ToString(snoozeRaw), out var parsedMinutes)
+                ? parsedMinutes
+                : 15;
+            NotificationActivated?.Invoke(new TaskNotificationAction
+            {
+                TaskId = taskId,
+                Action = action,
+                SnoozeMinutes = snoozeMinutes
+            });
         };
     }
 
@@ -57,13 +67,22 @@ public static class TaskNotificationService
             .AddArgument("taskId", task.Id.ToString())
             .AddText(task.Title)
             .AddText(description)
+            .AddComboBox(
+                "snoozeMinutes",
+                "Отложить на",
+                "15",
+                ("15", "15 минут"),
+                ("60", "1 час"),
+                ("360", "6 часов"),
+                ("1440", "1 день"),
+                ("10080", "1 неделю"))
             .AddButton(new ToastButton()
                 .SetContent("Начать")
                 .AddArgument("action", "start")
                 .AddArgument("taskId", task.Id.ToString()))
             .AddButton(new ToastButton()
-                .SetContent("Отложить 15 мин")
-                .AddArgument("action", "snooze15")
+                .SetContent("Отложить")
+                .AddArgument("action", "snooze")
                 .AddArgument("taskId", task.Id.ToString()))
             .Show(toast =>
             {

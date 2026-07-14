@@ -43,6 +43,8 @@ public partial class MainWindow
         grid.Children.Add(HomeMiniCard("Подключения", $"{_connections.Connections.Count} записей", ShowConnections));
         grid.Children.Add(HomeMiniCard("Заметки", $"{openNotes} заметок", ShowNotes));
         grid.Children.Add(HomeMiniCard("Проекты", $"{activeProjects.Count} активных", ShowProjects));
+        grid.Children.Add(HomeMiniCard("Буфер", $"{_clipboardHistory.Items.Count} элементов", ShowClipboardHistory));
+        grid.Children.Add(HomeMiniCard("Пульс", $"CPU {_pulseSnapshot.CpuPercent:0}% · RAM {_pulseSnapshot.MemoryPercent:0}%", ShowPulse));
         right.Children.Add(grid);
         Grid.SetColumn(right, 1);
         root.Children.Add(right);
@@ -56,10 +58,10 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("CardBrush"),
             BorderBrush = (WpfBrush)FindResource("AccentBorderBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(20),
-            Margin = new Thickness(8),
-            MinHeight = 210,
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(18),
+            Margin = new Thickness(6),
+            MinHeight = 190,
             Cursor = System.Windows.Input.Cursors.Hand
         };
         var stack = new StackPanel();
@@ -182,11 +184,6 @@ public partial class MainWindow
         foreach (var task in _tasks.Tasks.Where(t => !t.IsDone).OrderByDescending(t => t.StartAt).Take(8))
         {
             items.Add((task.StartAt, $"Задача: {task.Title}", () => EditTask(task)));
-        }
-
-        foreach (var entry in _activity.Entries.OrderByDescending(e => e.At).Take(12))
-        {
-            items.Add((entry.At, $"{entry.Status}: {Preview(entry.Message, 60)}", () => ShowHistory()));
         }
 
         return items.OrderByDescending(x => x.At).Select(x => (x.Label, x.Action));

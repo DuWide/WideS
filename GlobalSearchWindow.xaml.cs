@@ -62,7 +62,6 @@ public partial class GlobalSearchWindow : Window
             return;
         }
 
-        DialogResult = true;
         Close();
         hit.Open();
     }
@@ -91,7 +90,6 @@ public partial class GlobalSearchWindow : Window
         }
         else if (e.Key == Key.Escape)
         {
-            DialogResult = false;
             Close();
             e.Handled = true;
         }

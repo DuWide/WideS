@@ -12,7 +12,7 @@
         AllowsTransparency="True"
         ResizeMode="CanResize"
         Background="Transparent">
-    <Border BorderBrush="#2A323D" BorderThickness="1" CornerRadius="12" Background="{StaticResource AppBgBrush}">
+    <Border Style="{StaticResource DialogFrame}">
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="42" />
@@ -23,26 +23,11 @@
                 <RowDefinition Height="56" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{StaticResource SidebarBrush}"
-                    CornerRadius="11,11,0,0" BorderBrush="#1E242C" BorderThickness="0,0,0,1"
+            <Border Grid.Row="0" Style="{StaticResource DialogHeader}"
+                    CornerRadius="7,7,0,0" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <DockPanel LastChildFill="True">
-                    <Button DockPanel.Dock="Right" Content="✕" Width="42" Height="42" Padding="0"
-                            Foreground="{StaticResource MutedBrush}" FontSize="14" Cursor="Hand" Click="Cancel_Click">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="Bd" Background="Transparent" Width="42" Height="42" CornerRadius="0,11,0,0">
-                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Bd" Property="Background" Value="#C42B1C" />
-                                        <Setter Property="Foreground" Value="White" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource DialogCloseButton}" Click="Cancel_Click"><Path Data="{StaticResource CloseIconGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" /></Button>
                     <TextBlock Text="Скопировать в AI" Foreground="{StaticResource TextBrush}"
                                FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Margin="18,0,0,0" />
                 </DockPanel>
@@ -59,7 +44,7 @@
             <Border Grid.Row="2" Padding="20,0,20,8">
                 <DockPanel LastChildFill="True">
                     <TextBlock DockPanel.Dock="Top" Text="Заметки проекта" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                    <ListBox x:Name="NotesList" BorderBrush="#2A323D" Background="{StaticResource PanelBrush}" />
+                    <ListBox x:Name="NotesList" BorderBrush="{DynamicResource BorderMainBrush}" Background="{StaticResource PanelBrush}" />
                 </DockPanel>
             </Border>
 
@@ -70,7 +55,7 @@
                         <Button x:Name="AddFilesButton" Content="Добавить файлы..." Margin="12,0,0,0"
                                 Padding="10,4" Cursor="Hand" Click="AddFiles_Click" />
                     </StackPanel>
-                    <ListBox x:Name="FilesList" BorderBrush="#2A323D" Background="{StaticResource PanelBrush}" />
+                    <ListBox x:Name="FilesList" BorderBrush="{DynamicResource BorderMainBrush}" Background="{StaticResource PanelBrush}" />
                 </DockPanel>
             </Border>
 
@@ -78,8 +63,8 @@
                 <TextBlock x:Name="SizeLabel" Foreground="{StaticResource AccentBrush}" FontSize="12" />
             </Border>
 
-            <Border Grid.Row="5" Background="{StaticResource SidebarBrush}" CornerRadius="0,0,11,11"
-                    BorderBrush="#1E242C" BorderThickness="0,1,0,0" Padding="16,10">
+            <Border Grid.Row="5" Background="{StaticResource SidebarBrush}" CornerRadius="0,0,7,7"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="16,10">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="CopyButton" Content="Скопировать" MinWidth="130" Margin="0,0,8,0"
                             Style="{StaticResource PrimaryButton}" Click="Copy_Click" />

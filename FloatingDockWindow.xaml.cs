@@ -5,7 +5,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
-using WpfPath = System.Windows.Shapes.Path;
 using HorizontalAlignment = System.Windows.HorizontalAlignment;
 
 namespace DevCockpit;
@@ -65,6 +64,14 @@ public partial class FloatingDockWindow : Window
         _dockPosition = dockPosition;
         _autoHide = autoHide;
         _showMedia = showMedia;
+    }
+
+    public void RefreshTheme()
+    {
+        Root.SetResourceReference(Border.BackgroundProperty, "PanelBrush");
+        Root.SetResourceReference(Border.BorderBrushProperty, "AccentBorderBrush");
+        InvalidateVisual();
+        UpdateLayout();
     }
 
     public void SetConnections(
@@ -141,7 +148,7 @@ public partial class FloatingDockWindow : Window
 
     private void FloatingDockWindow_Drop(object sender, System.Windows.DragEventArgs e)
     {
-        Root.BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(44, 86, 107));
+        Root.SetResourceReference(Border.BorderBrushProperty, "AccentBorderBrush");
         if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return;
         var files = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
         if (files.Length > 0) _onFilesDropped(files);
@@ -229,42 +236,22 @@ public partial class FloatingDockWindow : Window
     private FrameworkElement DockContent(string icon, string label)
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
-        stack.Children.Add(MakeIcon(icon, 20));
-        stack.Children.Add(new TextBlock
+        stack.Children.Add(MakeIcon(icon, 18));
+        var text = new TextBlock
         {
             Text = label,
             FontSize = 10,
-            Foreground = (WpfBrush)FindResource("MutedBrush"),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 3, 0, 0)
-        });
+        };
+        text.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        stack.Children.Add(text);
         return stack;
     }
 
     private FrameworkElement MakeIcon(string iconName, double size)
     {
-        var geometry = iconName switch
-        {
-            "task" => "M9 16.2l-3.5-3.5L4 14.2l5 5 11-11-1.4-1.4L9 16.2z",
-            "note" => "M4 4h12l4 4v12H4V4z M15 5v4h4 M7 12h10v2H7v-2z M7 15h7v2H7v-2z",
-            "drop" => "M12 2l6 8a6 6 0 1 1-12 0l6-8z",
-            "open" => "M3 3h8v2H5v14h14v-6h2v8H3V3z M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14V3z",
-            "connection" => "M4 6h16v12H4V6z M8 10h8v2H8v-2z M12 2v4 M8 6l4-4 4 4",
-            "play" => "M8 5v14l11-7L8 5z",
-            "pause" => "M6 5h4v14H6V5z M14 5h4v14h-4V5z",
-            "prev" => "M6 6h2v12H6V6z M20 6v12l-9-6 9-6z",
-            "next" => "M16 6h2v12h-2V6z M4 6l9 6-9 6V6z",
-            "close" => "M6.4 5L5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6 6.4 5z",
-            _ => "M4 4h16v16H4V4z"
-        };
-        return new WpfPath
-        {
-            Data = Geometry.Parse(geometry),
-            Fill = (WpfBrush)FindResource("TextBrush"),
-            Stretch = Stretch.Uniform,
-            Width = size,
-            Height = size
-        };
+        return UiIconFactory.Create(iconName, size);
     }
 
     private static bool IsInsideButton(DependencyObject? source)

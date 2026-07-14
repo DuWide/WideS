@@ -1,21 +1,25 @@
 <Window x:Class="DevCockpit.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="WideS"
         Icon="Assets/WideS.ico"
-        Width="1280"
-        Height="820"
-        MinWidth="1080"
-        MinHeight="700"
+        Width="1360"
+        Height="860"
+        MinWidth="1040"
+        MinHeight="680"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        AllowsTransparency="True"
+        AllowsTransparency="False"
         ResizeMode="CanResize"
-        Background="Transparent">
-    <Border Background="{DynamicResource AppBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1" CornerRadius="12">
+        Background="{DynamicResource AppBgBrush}">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+    <Border Background="{DynamicResource AppBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1" CornerRadius="8">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="38" />
+                <RowDefinition Height="40" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -24,17 +28,17 @@
                     Background="{DynamicResource SidebarBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}"
                     BorderThickness="0,0,0,1"
-                    CornerRadius="11,11,0,0"
+                    CornerRadius="7,7,0,0"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <DockPanel LastChildFill="False">
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
-                        <Image Source="Assets/WideS.png" Width="20" Height="20" Margin="0,0,8,0" />
-                        <TextBlock Text="WideS" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                        <Image Source="Assets/WideS.png" Width="18" Height="18" Margin="0,0,8,0" />
+                        <TextBlock Text="WideS" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
-                        <Button x:Name="MinimizeButton" Width="38" Height="28" Style="{StaticResource WindowButton}" Click="Minimize_Click" />
-                        <Button x:Name="MaximizeButton" Width="38" Height="28" Style="{StaticResource WindowButton}" Click="Maximize_Click" />
-                        <Button x:Name="CloseButton" Width="38" Height="28" Margin="2,0,0,0" Style="{StaticResource WindowButton}" Click="CloseWindow_Click" />
+                        <Button x:Name="MinimizeButton" AutomationProperties.Name="Свернуть" Width="40" Height="30" Style="{StaticResource WindowButton}" Click="Minimize_Click" />
+                        <Button x:Name="MaximizeButton" AutomationProperties.Name="Развернуть" Width="40" Height="30" Style="{StaticResource WindowButton}" Click="Maximize_Click" />
+                        <Button x:Name="CloseButton" AutomationProperties.Name="Скрыть в трей" Width="40" Height="30" Margin="2,0,0,0" Style="{StaticResource DialogCloseButton}" Click="CloseWindow_Click" />
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -42,7 +46,7 @@
             <!-- MAIN AREA -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition x:Name="SidebarColumn" Width="200" />
+                    <ColumnDefinition x:Name="SidebarColumn" Width="220" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
@@ -51,7 +55,7 @@
                         Background="{DynamicResource SidebarBrush}"
                         BorderBrush="{DynamicResource BorderSubtleBrush}"
                         BorderThickness="0,0,1,0">
-                    <Grid Margin="10,14,10,14">
+                    <Grid Margin="12,14,12,12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
@@ -65,7 +69,7 @@
 
                         <StackPanel Grid.Row="1">
                             <Border x:Name="NowPlayingPanel" Background="{DynamicResource AccentSoftBgBrush}" BorderBrush="{DynamicResource AccentBorderBrush}" BorderThickness="1"
-                                    CornerRadius="10" Padding="10,9" Margin="0,0,0,8" Visibility="Collapsed">
+                                    CornerRadius="8" Padding="10" Margin="0,0,0,8" Visibility="Collapsed">
                                 <DockPanel LastChildFill="True">
                                     <Image x:Name="NpAlbumArt" DockPanel.Dock="Left" Width="44" Height="44"
                                            Margin="0,0,10,0" Stretch="UniformToFill" Visibility="Collapsed" />
@@ -74,12 +78,12 @@
                                         <Border Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBrush}"
                                                 VerticalAlignment="Center" Margin="0,0,7,0" />
                                         <TextBlock x:Name="NpSource" Text="Сейчас играет" FontSize="9" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                                   Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
                                     </StackPanel>
                                     <TextBlock x:Name="NpTitle" Text="" FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                               Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock x:Name="NpArtist" Text="" FontSize="10"
-                                               Foreground="{StaticResource MutedBrush}" TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis"
                                                Margin="0,1,0,8" />
                                     <StackPanel x:Name="NpControls" Orientation="Horizontal" HorizontalAlignment="Center">
                                         <Button x:Name="NpPrev" Width="30" Height="28" Style="{StaticResource WindowButton}"
@@ -93,8 +97,8 @@
                                 </DockPanel>
                             </Border>
                             <Border x:Name="SidebarFooterPanel" Background="{DynamicResource SidebarFooterBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="10,8" Margin="0,0,0,4">
-                                <TextBlock Text="local · DPAPI secrets" FontSize="10"
+                                    CornerRadius="6" Padding="10,7" Margin="0,0,0,2">
+                                <TextBlock Text="Локально · защищено DPAPI" FontSize="10"
                                            Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
                             </Border>
                         </StackPanel>
@@ -106,26 +110,26 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{DynamicResource AppBgBrush}" Padding="22,14,22,12"
+                    <Border Grid.Row="0" Background="{DynamicResource AppBgBrush}" Padding="24,18,24,16"
                             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
                         <DockPanel LastChildFill="True">
                             <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <Button x:Name="BackButton" Width="32" Height="30" Style="{StaticResource GhostButton}" ToolTip="Назад" Click="Back_Click" />
-                                <Button x:Name="ForwardButton" Width="32" Height="30" Style="{StaticResource GhostButton}" ToolTip="Вперёд" Click="Forward_Click" Margin="4,0,0,0" />
+                                <Button x:Name="BackButton" AutomationProperties.Name="Назад" Width="32" Height="32" Style="{StaticResource GhostButton}" ToolTip="Назад" Click="Back_Click" />
+                                <Button x:Name="ForwardButton" AutomationProperties.Name="Вперёд" Width="32" Height="32" Style="{StaticResource GhostButton}" ToolTip="Вперёд" Click="Forward_Click" Margin="4,0,0,0" />
                             </StackPanel>
-                            <StackPanel x:Name="TopNavPanel" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" />
                             <Border x:Name="ActiveTaskPill"
                                     DockPanel.Dock="Right"
                                     Visibility="Collapsed"
                                     Background="{DynamicResource AccentSoftBgBrush}"
                                     BorderBrush="{DynamicResource AccentBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="14"
-                                    Padding="10,4"
+                                    CornerRadius="6"
+                                    Padding="10,5"
                                     Margin="0,0,10,0"
                                     VerticalAlignment="Center"
                                     Cursor="Hand"
@@ -133,45 +137,60 @@
                                 <TextBlock x:Name="ActiveTaskPillText"
                                            FontSize="11"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentBrush}"
                                            TextTrimming="CharacterEllipsis"
                                            MaxWidth="260" />
                             </Border>
                             <ComboBox x:Name="ProjectSwitcher"
                                       DockPanel.Dock="Right"
-                                      Width="220"
+                                      Width="240"
                                       Margin="0,0,12,0"
                                       VerticalAlignment="Center"
                                       IsEditable="False"
                                       SelectionChanged="ProjectSwitcher_SelectionChanged" />
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock x:Name="PageTitle" Text="Главная" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextBrush}" />
+                                <TextBlock x:Name="PageTitle" Text="Главная" Style="{StaticResource PageTitleText}" />
                                 <TextBlock x:Name="PageSubtitle" Text="" FontSize="12"
-                                           Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                                           Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </DockPanel>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                    <Border Grid.Row="1"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="24,8">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="GlobalSearchButton" AutomationProperties.Name="Поиск" Width="32" Height="32" Style="{StaticResource GhostButton}"
+                                        ToolTip="Поиск (Ctrl+K)" Click="GlobalSearch_Click" />
+                                <Button x:Name="DockToggleButton" AutomationProperties.Name="Плавающая панель" Width="32" Height="32" Margin="6,0,0,0" Style="{StaticResource GhostButton}"
+                                        ToolTip="Floating Dock (Ctrl+Alt+Space)" Click="DockToggle_Click" />
+                            </StackPanel>
+                            <StackPanel x:Name="TopNavPanel" Orientation="Horizontal" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto"
                                   VerticalScrollBarVisibility="Disabled"
                                   Background="{DynamicResource AppBgBrush}"
-                                  Padding="22,4,22,4">
+                                  Padding="24,5,24,3">
                         <StackPanel x:Name="TabsPanel" Orientation="Horizontal" />
                     </ScrollViewer>
 
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="22,12,22,12">
+                    <ScrollViewer x:Name="ContentScrollViewer" Grid.Row="3" VerticalScrollBarVisibility="Auto" Padding="24,16,24,18">
                         <ContentControl x:Name="ContentHost" />
                     </ScrollViewer>
 
                     <Border x:Name="LogPanel"
-                            Grid.Row="3"
+                            Grid.Row="4"
                             Background="{DynamicResource LogPanelBgBrush}"
                             BorderBrush="{DynamicResource BorderSubtleBrush}"
                             BorderThickness="0,1,0,0"
-                            Padding="22,7"
-                            Height="38"
-                            CornerRadius="0,0,11,11"
+                            Padding="24,7"
+                            Height="36"
+                            CornerRadius="0,0,7,7"
                             Cursor="Hand"
                             MouseEnter="LogPanel_MouseEnter"
                             MouseLeave="LogPanel_MouseLeave"
@@ -185,10 +204,10 @@
                                 </Border>
                             </StackPanel>
                             <TextBlock x:Name="LogPreview" DockPanel.Dock="Left" FontFamily="Consolas" FontSize="11"
-                                       Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis" MaxWidth="900" />
                             <TextBox x:Name="LogBox" IsReadOnly="True" BorderThickness="0"
-                                     Background="Transparent" FontFamily="Consolas" FontSize="12"
+                                     Background="Transparent" FontFamily="{StaticResource MonoFont}" FontSize="12"
                                      VerticalScrollBarVisibility="Auto" Visibility="Collapsed" />
                         </DockPanel>
                     </Border>

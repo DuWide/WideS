@@ -30,13 +30,14 @@ public partial class MainWindow
     private void AfterLoadData()
     {
         RefreshProjectSwitcher();
-        ApplyTheme(_settings.AccentTheme);
+        var smokeTheme = Environment.GetEnvironmentVariable("WIDES_THEME");
+        ApplyTheme(string.IsNullOrWhiteSpace(smokeTheme) ? _settings.AccentTheme : smokeTheme);
         ApplyCompactSidebar(_settings.CompactSidebar);
     }
 
     private void ApplyCompactSidebar(bool compact)
     {
-        SidebarColumn.Width = new GridLength(compact ? 56 : 200);
+        SidebarColumn.Width = new GridLength(compact ? 64 : 220);
         foreach (var group in _navGroups)
         {
             group.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
@@ -52,7 +53,7 @@ public partial class MainWindow
             button.HorizontalContentAlignment = compact
                 ? System.Windows.HorizontalAlignment.Center
                 : System.Windows.HorizontalAlignment.Left;
-            button.Padding = compact ? new Thickness(8, 9, 8, 9) : new Thickness(12, 9, 12, 9);
+            button.Padding = compact ? new Thickness(8, 8, 8, 8) : new Thickness(10, 7, 10, 7);
         }
 
         SidebarFooterPanel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
@@ -78,10 +79,10 @@ public partial class MainWindow
         var header = new TextBlock
         {
             Text = title,
-            FontSize = 10,
+            FontSize = 9,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(74, 85, 104)),
-            Margin = new Thickness(8, 10, 0, 6)
+            Foreground = (WpfBrush)FindResource("SubtleBrush"),
+            Margin = new Thickness(10, 12, 0, 5)
         };
         _navGroups.Add(header);
         NavPanel.Children.Add(header);
@@ -96,23 +97,27 @@ public partial class MainWindow
         _navGroups.Clear();
         _navLabels.Clear();
 
-        AddNavGroup("РАБОТА");
+        AddNavGroup("РАБОЧЕЕ ПРОСТРАНСТВО");
         AddNav("Главная", "home", ShowHome);
         AddNav("Проекты", "projects", ShowProjects);
-        AddNav("Задачи", "tasks", ShowTasks);
         AddNav("Клиенты", "contacts", ShowContacts);
-        AddNav("Заметки", "notes", ShowNotes);
-        AddNav("Подключения", "connections", ShowConnections);
+
+        AddNavGroup("ЖИВОЕ");
+        AddNav("Буфер", "clipboard", ShowClipboardHistory);
+        AddNav("Пульс", "pulse", ShowPulse);
         AddNav("Браузер", "ai", ShowAiAgents);
 
         AddNavGroup("ИНСТРУМЕНТЫ");
         AddNav("Команды", "commands", ShowCommandRecipes);
         AddNav("Backup", "backup", ShowBackupContext);
-        AddNav("DropZone", "dropzone", ShowDropZone);
 
         AddNavGroup("СИСТЕМА");
         AddNav("Настройки", "settings", ShowSettings);
 
+        AddTopNav("Заметки", "notes", ShowNotes);
+        AddTopNav("Подключения", "connections", ShowConnections);
+        AddTopNav("Задачи", "tasks", ShowTasks);
+        AddTopNav("DropZone", "dropzone", ShowDropZone);
         AddTopNav("Избранное", "favorites", ShowFavorites);
         UpdateNavHighlight();
         ApplyCompactSidebar(_settings.CompactSidebar);
@@ -130,11 +135,10 @@ public partial class MainWindow
 
     private void SetTitle(string title, string subtitle, string? breadcrumb = null)
     {
+        ContentScrollViewer.ScrollToTop();
         PageTitle.Text = title;
         _breadcrumb = breadcrumb ?? title;
-        PageSubtitle.Text = string.IsNullOrWhiteSpace(subtitle)
-            ? _breadcrumb
-            : $"{_breadcrumb}  ›  {subtitle}";
+        PageSubtitle.Text = string.IsNullOrWhiteSpace(subtitle) ? _breadcrumb : subtitle;
     }
 
     private void RefreshProjectSwitcher()
@@ -188,6 +192,7 @@ public partial class MainWindow
     private void ApplyTheme(string theme)
     {
         ThemeService.Apply(theme);
+        _dockWindow?.RefreshTheme();
     }
 
     private IEnumerable<TaskItem> FilteredTasks(bool archive)
@@ -307,10 +312,10 @@ public partial class MainWindow
             Background = (WpfBrush)FindResource("CardBrush"),
             BorderBrush = (WpfBrush)FindResource("AccentBorderBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(6),
             Padding = new Thickness(12, 10, 12, 10),
             Margin = new Thickness(8, 4, 8, 4),
-            Width = 760,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
             Cursor = System.Windows.Input.Cursors.Hand
         };
         var grid = new Grid();
@@ -327,8 +332,7 @@ public partial class MainWindow
         grid.Children.Add(text);
         if (pinToggle is not null)
         {
-            var star = ActionButton("★", pinToggle, false);
-            star.Width = 36;
+            var star = FavoriteIconButton(true, pinToggle);
             Grid.SetColumn(star, 2);
             grid.Children.Add(star);
         }

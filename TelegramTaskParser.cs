@@ -16,28 +16,28 @@ public sealed class TelegramParsedTask
 public static class TelegramTaskParser
 {
     private static readonly Regex HeaderRegex = new(
-        @"Новая\s+задача\s+для\s+исполнителя:\s*(\d+)\s+от\s+([\d.]+)",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*Новая\s+задача\s+для\s+исполнителя:\s*(\d+)\s+от\s+([\d.]+)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex CustomerRegex = new(
-        @"\*?\s*Заказчик:\s*(.+?)\s*\*?",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*\*?\s*Заказчик:\s*(.+?)\s*\*?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex DescriptionRegex = new(
-        @"\*?\s*1\.\s*(.+?)\s*\*?",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*\*?\s*1\.\s*(.+?)\s*\*?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex StartRegex = new(
-        @"Начало\s+работы:\s*([\d.\s:]+)",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*Начало\s+работы:\s*([\d.\s:]+?)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex StatusRegex = new(
-        @"Состояние:\s*(.+)",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*Состояние:\s*(.+?)\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     private static readonly Regex ContactRegex = new(
-        @"\*?\s*Контакт:\s*(.+?)(?:\s*тел:\s*([+\d\s()-]+))?\s*\*?",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        @"^\s*\*?\s*Контакт:\s*(.+?)(?:\s+тел:\s*([+\d\s()-]+))?\s*\*?\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     public static TelegramParsedTask? TryParse(string? text)
     {
@@ -62,11 +62,13 @@ public static class TelegramTaskParser
         if (start.Success)
         {
             var raw = start.Groups[1].Value.Trim();
-            if (!DateTime.TryParseExact(raw, "dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out startAt) &&
-                !DateTime.TryParseExact(raw, "dd.MM.yyyy H:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out startAt))
+            if (!DateTime.TryParseExact(raw, "dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedStart) &&
+                !DateTime.TryParseExact(raw, "dd.MM.yyyy H:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedStart) &&
+                !DateTime.TryParse(raw, CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out parsedStart))
             {
-                DateTime.TryParse(raw, CultureInfo.GetCultureInfo("ru-RU"), DateTimeStyles.None, out startAt);
+                parsedStart = DateTime.Now;
             }
+            startAt = parsedStart;
         }
 
         var title = customer.Groups[1].Value.Trim().Trim('"');

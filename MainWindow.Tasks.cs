@@ -26,7 +26,7 @@ public partial class MainWindow
             : $"Фильтр: {_contactFilterLabel}";
         SetTitle("Задачи", subtitle);
         var root = new DockPanel();
-        var toolbar = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var toolbar = new StackPanel();
         var row1 = UiHelpers.ToolbarRow();
         var row2 = UiHelpers.ToolbarRow();
         var list = new StackPanel { Margin = new Thickness(0) };
@@ -171,8 +171,9 @@ public partial class MainWindow
         AddViewModeButtons(row2, ShowTasks);
         toolbar.Children.Add(row1);
         toolbar.Children.Add(row2);
-        DockPanel.SetDock(toolbar, Dock.Top);
-        root.Children.Add(toolbar);
+        var toolbarShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = toolbar };
+        DockPanel.SetDock(toolbarShell, Dock.Top);
+        root.Children.Add(toolbarShell);
         Render();
         root.Children.Add(list);
         ContentHost.Content = root;
@@ -215,7 +216,7 @@ public partial class MainWindow
         WindowPlacementService.PlaceOnPrimary(win);
         win.Show();
     }
-    private void StartTask(TaskItem task, bool openEditor = true)
+    private void StartTask(TaskItem task, bool openEditor = false)
     {
         ClearOtherRunningTasks(task.Id);
         task.IsDone = false;
@@ -226,6 +227,7 @@ public partial class MainWindow
         _trackedTaskId = task.Id;
         _tasksStore.Save(_tasks);
         AddLog("OK", $"Задача в работе: {task.Title}");
+        TaskNotificationService.ClearReminder(task.Id);
         UpdateActiveTaskPill();
         if (openEditor)
         {
@@ -339,7 +341,6 @@ public partial class MainWindow
             _activeReminderWindow = null;
             if (win.StartRequested)
             {
-                ShowFromTray();
                 StartTask(task, openEditor: false);
             }
             else if (win.Snooze is { } snooze)
@@ -526,7 +527,7 @@ public partial class MainWindow
         }
         if (!string.IsNullOrWhiteSpace(task.Description))
         {
-            stack.Children.Add(Text(Preview(task.Description, 220), 14, WpfBrushes.WhiteSmoke, new Thickness(0, 10, 0, 10)));
+        stack.Children.Add(Text(Preview(task.Description, 220), 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 10, 0, 10)));
         }
         var buttons = new WrapPanel();
         if (task.IsDone)

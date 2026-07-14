@@ -22,7 +22,8 @@ public partial class MainWindow
         EnterView("dropzone");
         SetTitle("DropZone", "Все файлы — в одну папку проекта");
         var card = Card("Перетащите файлы сюда");
-        card.Width = 980;
+        card.Width = double.NaN;
+        card.HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
         card.MinHeight = 430;
         card.AllowDrop = true;
         card.DragOver += (_, e) => e.Effects = System.Windows.DragDropEffects.Copy;
@@ -39,7 +40,7 @@ public partial class MainWindow
         stack.Children.Add(actions);
         if (_droppedFiles.Count > 0)
         {
-            stack.Children.Add(Text("Добавлено:", 16, WpfBrushes.WhiteSmoke, new Thickness(0, 22, 0, 8), FontWeights.SemiBold));
+            stack.Children.Add(Text("Добавлено:", 16, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 22, 0, 8), FontWeights.SemiBold));
             stack.Children.Add(Text(string.Join("\n", _droppedFiles.TakeLast(12)), 13, (WpfBrush)FindResource("MutedBrush"), new Thickness()));
         }
         card.Child = stack;
