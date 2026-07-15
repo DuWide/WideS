@@ -38,7 +38,6 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
 
     public bool IsMiniMode { get; private set; }
     public event Action<bool>? FullScreenChanged;
-    public event Action? DragRequested;
 
     public VideoBrowserView(
         string applicationToken,
@@ -128,11 +127,10 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             Browser.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
             Browser.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
             Browser.CoreWebView2.NewWindowRequested += (_, args) => args.Handled = true;
-            Browser.CoreWebView2.NavigationCompleted += async (_, args) =>
+            Browser.CoreWebView2.NavigationCompleted += (_, args) =>
             {
                 PlayerStatus.Text = args.IsSuccess ? "" : "Ошибка загрузки плеера";
                 if (_currentVideo is not null) LoadingPanel.Visibility = Visibility.Collapsed;
-                if (IsMiniMode) await EnableMiniDragOverlayAsync();
             };
             Browser.CoreWebView2.ContainsFullScreenElementChanged += (_, _) =>
             {
@@ -145,12 +143,17 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
                     var message = args.TryGetWebMessageAsString();
                     if (string.Equals(message, "drag", StringComparison.OrdinalIgnoreCase))
                     {
-                        DragRequested?.Invoke();
                         return;
                     }
                     if (string.Equals(message, "skipped_op", StringComparison.OrdinalIgnoreCase))
                     {
                         Dispatcher.Invoke(() => PlayerStatus.Text = "Опенинг пропущен");
+                        return;
+                    }
+                    if (message is not null &&
+                        message.StartsWith("watched:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Dispatcher.Invoke(() => _ = HandleWatchedProgressMessageAsync(message));
                         return;
                     }
                     if (string.Equals(message, "ended", StringComparison.OrdinalIgnoreCase))
@@ -558,11 +561,14 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         await PlayEpisodeAsync(video);
     }
 
-    private async Task PlayEpisodeAsync(YummyAnimeVideo video)
+    private Task PlayEpisodeAsync(YummyAnimeVideo video)
     {
         var playerUri = video.GetPlayerUri();
-        if (playerUri is null || Browser.CoreWebView2 is null) return;
-        if (_currentVideo?.VideoId == video.VideoId && LoadingPanel.Visibility != Visibility.Visible) return;
+        if (playerUri is null || Browser.CoreWebView2 is null) return Task.CompletedTask;
+        if (_currentVideo?.VideoId == video.VideoId && LoadingPanel.Visibility != Visibility.Visible)
+        {
+            return Task.CompletedTask;
+        }
 
         _currentVideo = video;
         PlayerStatus.Text = "Загрузка плеера…";
@@ -590,11 +596,22 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             </html>
             """);
 
-        await RecordWatchAsync(video);
-        if (IsMiniMode) await EnableMiniDragOverlayAsync();
+        TouchRecentOpen(video);
+        return Task.CompletedTask;
     }
 
-    private async Task RecordWatchAsync(YummyAnimeVideo video)
+    private async Task HandleWatchedProgressMessageAsync(string message)
+    {
+        if (_currentVideo is null) return;
+        var parts = message.Split(':');
+        var progress = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 0;
+        var duration = parts.Length > 2 && int.TryParse(parts[2], out var d)
+            ? d
+            : Math.Max(0, (int)_currentVideo.Duration);
+        await RecordWatchAsync(_currentVideo, progress, duration);
+    }
+
+    private void TouchRecentOpen(YummyAnimeVideo video)
     {
         var animeId = _selectedAnime?.AnimeId ?? _selectedFavorite?.AnimeId ?? 0;
         var animeTitle = _selectedAnime?.Title
@@ -603,8 +620,48 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         var posterUrl = _selectedAnime?.PosterUrl
             ?? _selectedFavorite?.PosterUrl
             ?? "";
-        var duration = Math.Max(0, (int)video.Duration);
-        var progress = duration > 0 ? Math.Max(1, duration / 20) : 0;
+
+        var existing = _watchHistory.FirstOrDefault(entry => entry.VideoId == video.VideoId);
+        if (existing is null)
+        {
+            existing = new YummyAnimeWatchEntry { VideoId = video.VideoId };
+            _watchHistory.Insert(0, existing);
+        }
+
+        existing.AnimeId = animeId;
+        existing.AnimeTitle = animeTitle;
+        existing.Episode = video.DisplayTitle;
+        existing.Dubbing = video.Dubbing;
+        existing.Player = video.Player;
+        existing.PosterUrl = posterUrl;
+        existing.DurationSeconds = Math.Max(existing.DurationSeconds, (int)video.Duration);
+        existing.WatchedAt = DateTime.Now;
+
+        while (_watchHistory.Count > 200)
+        {
+            _watchHistory.RemoveAt(_watchHistory.Count - 1);
+        }
+
+        _saveLocalData();
+        if (!video.IsWatched && !_watchedVideoIds.Contains(video.VideoId))
+        {
+            PlayerStatus.Text = "Отметка «просмотрено» — когда до конца останется ≤ 10 мин";
+        }
+    }
+
+    private async Task RecordWatchAsync(YummyAnimeVideo video, int progressSeconds, int durationSeconds)
+    {
+        if (_watchedVideoIds.Contains(video.VideoId) && video.IsWatched) return;
+
+        var animeId = _selectedAnime?.AnimeId ?? _selectedFavorite?.AnimeId ?? 0;
+        var animeTitle = _selectedAnime?.Title
+            ?? _selectedFavorite?.Title
+            ?? SelectedAnimeTitle.Text;
+        var posterUrl = _selectedAnime?.PosterUrl
+            ?? _selectedFavorite?.PosterUrl
+            ?? "";
+        var duration = durationSeconds > 0 ? durationSeconds : Math.Max(0, (int)video.Duration);
+        var progress = Math.Clamp(progressSeconds, 0, duration > 0 ? duration : progressSeconds);
 
         var existing = _watchHistory.FirstOrDefault(entry => entry.VideoId == video.VideoId);
         if (existing is null)
@@ -802,30 +859,28 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         host.Content = this;
     }
 
-    public async Task<bool> TryEnterMiniModeAsync()
+    public Task<bool> TryEnterMiniModeAsync()
     {
-        if (_currentVideo is null || Browser.CoreWebView2 is null) return false;
-        if (IsMiniMode) return true;
+        if (_currentVideo is null || Browser.CoreWebView2 is null) return Task.FromResult(false);
+        if (IsMiniMode) return Task.FromResult(true);
         IsMiniMode = true;
         ApplyPlayerOnlyLayout();
-        await EnableMiniDragOverlayAsync();
-        return true;
+        return Task.FromResult(true);
     }
 
-    public async Task ExitMiniModeAsync()
+    public Task ExitMiniModeAsync()
     {
-        if (!IsMiniMode) return;
+        if (!IsMiniMode) return Task.CompletedTask;
         IsMiniMode = false;
-        await DisableMiniDragOverlayAsync();
         RestoreNormalLayout();
+        return Task.CompletedTask;
     }
 
     public void EnterFullScreenHostLayout() => ApplyPlayerOnlyLayout();
 
-    public async void ExitFullScreenHostLayout()
+    public void ExitFullScreenHostLayout()
     {
         if (!IsMiniMode) RestoreNormalLayout();
-        await Task.CompletedTask;
     }
 
     private void ApplyPlayerOnlyLayout()
@@ -861,53 +916,6 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             : Visibility.Collapsed;
         PlayerFrame.BorderThickness = new Thickness(1);
         PlayerFrame.CornerRadius = new CornerRadius(8);
-    }
-
-    private async Task EnableMiniDragOverlayAsync()
-    {
-        if (Browser.CoreWebView2 is null) return;
-        try
-        {
-            await Browser.CoreWebView2.ExecuteScriptAsync(
-                """
-                (() => {
-                  let bar = document.getElementById('wides-drag');
-                  if (!bar) {
-                    bar = document.createElement('div');
-                    bar.id = 'wides-drag';
-                    bar.addEventListener('mousedown', (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      try { chrome.webview.postMessage('drag'); } catch {}
-                    });
-                    document.body.appendChild(bar);
-                  }
-                  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;height:22px;z-index:2147483647;cursor:move;background:transparent;';
-                  return true;
-                })();
-                """);
-        }
-        catch
-        {
-        }
-    }
-
-    private async Task DisableMiniDragOverlayAsync()
-    {
-        if (Browser.CoreWebView2 is null) return;
-        try
-        {
-            await Browser.CoreWebView2.ExecuteScriptAsync(
-                """
-                (() => {
-                  const bar = document.getElementById('wides-drag');
-                  if (bar) bar.remove();
-                })();
-                """);
-        }
-        catch
-        {
-        }
     }
 
     public void StopPlayback()

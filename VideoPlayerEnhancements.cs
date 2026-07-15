@@ -2,13 +2,17 @@ namespace DevCockpit;
 
 internal static class VideoPlayerScripts
 {
+    // Отмечаем серию просмотренной, когда до конца осталось ≤ 10 минут.
+    private const int WatchedRemainingSeconds = 600;
+
     public static string BuildFrameEnhancements(bool skipOp, int skipSec, bool autoNext) =>
         $$"""
         (() => {
           const cfg = {
             skipOp: {{(skipOp ? "true" : "false")}},
             skipSec: {{Math.Max(20, skipSec)}},
-            autoNext: {{(autoNext ? "true" : "false")}}
+            autoNext: {{(autoNext ? "true" : "false")}},
+            watchRemain: {{WatchedRemainingSeconds}}
           };
           window.__widesCfg = cfg;
 
@@ -20,10 +24,11 @@ internal static class VideoPlayerScripts
           };
 
           let skippedOp = false;
+          let watchedSent = false;
           let endedSent = false;
 
           const isMainEpisode = (video) =>
-            !!video && Number.isFinite(video.duration) && video.duration >= (cfg.skipSec + 90);
+            !!video && Number.isFinite(video.duration) && video.duration >= Math.max(cfg.skipSec + 90, 480);
 
           const maybeSkipOp = (video) => {
             if (!cfg.skipOp || skippedOp) return;
@@ -37,11 +42,21 @@ internal static class VideoPlayerScripts
             }
           };
 
+          const maybeWatched = (video) => {
+            if (watchedSent || !isMainEpisode(video)) return;
+            const left = video.duration - video.currentTime;
+            if (left <= cfg.watchRemain) {
+              watchedSent = true;
+              post('watched:' + Math.floor(video.currentTime) + ':' + Math.floor(video.duration));
+            }
+          };
+
           const maybeEnded = (video) => {
             if (!cfg.autoNext || endedSent) return;
-            if (!isMainEpisode(video) && !(video.duration > 180)) return;
+            if (!isMainEpisode(video)) return;
             if (video.ended || (video.duration - video.currentTime) <= 1.25) {
               endedSent = true;
+              maybeWatched(video);
               post('ended');
             }
           };
@@ -51,6 +66,7 @@ internal static class VideoPlayerScripts
             video.__widesBound = true;
             video.addEventListener('timeupdate', () => {
               maybeSkipOp(video);
+              maybeWatched(video);
               maybeEnded(video);
             });
             video.addEventListener('ended', () => maybeEnded(video));

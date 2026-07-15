@@ -4,15 +4,52 @@
         Title="Плеер"
         Icon="Assets/WideS.ico"
         Width="540"
-        Height="304"
+        Height="332"
         MinWidth="360"
-        MinHeight="200"
+        MinHeight="220"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
         ResizeMode="CanResize"
         ShowInTaskbar="True"
         Topmost="True"
-        Background="#FF000000">
-    <ContentControl x:Name="PlayerHost" />
+        Background="#FF000000"
+        KeyDown="Window_KeyDown">
+    <Border Background="#FF000000"
+            BorderBrush="#FF3A3A3A"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="28" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Background="#FF1A1A1A"
+                    BorderBrush="#FF2E2E2E"
+                    BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="Chrome_MouseLeftButtonDown">
+                <Grid>
+                    <TextBlock Text="Плеер · перетащите здесь"
+                               Foreground="#FF9A9A9A"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               Margin="10,0,40,0"
+                               IsHitTestVisible="False" />
+                    <Button Content="✕"
+                            Width="28"
+                            Height="28"
+                            HorizontalAlignment="Right"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#FFCCCCCC"
+                            FontSize="12"
+                            Cursor="Hand"
+                            ToolTip="Закрыть плеер"
+                            Click="Close_Click" />
+                </Grid>
+            </Border>
+
+            <ContentControl x:Name="PlayerHost" Grid.Row="1" />
+        </Grid>
+    </Border>
 </Window>

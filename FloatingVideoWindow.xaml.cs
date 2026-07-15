@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 
 namespace DevCockpit;
 
@@ -17,24 +18,13 @@ public partial class FloatingVideoWindow : Window
 
     public void Attach(VideoBrowserView view)
     {
-        if (_view is not null)
-        {
-            _view.DragRequested -= HandleDragRequested;
-        }
-
         _view = view;
-        _view.DragRequested += HandleDragRequested;
         view.AttachTo(PlayerHost);
     }
 
     public void Detach()
     {
-        if (_view is not null)
-        {
-            _view.DragRequested -= HandleDragRequested;
-            _view = null;
-        }
-
+        _view = null;
         PlayerHost.Content = null;
     }
 
@@ -48,7 +38,7 @@ public partial class FloatingVideoWindow : Window
     {
         WindowState = WindowState.Normal;
         Width = 540;
-        Height = 304;
+        Height = 332;
     }
 
     public void ClosePermanently()
@@ -70,15 +60,35 @@ public partial class FloatingVideoWindow : Window
         base.OnClosing(e);
     }
 
-    private void HandleDragRequested()
+    private void Chrome_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton != MouseButton.Left) return;
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized
+                ? WindowState.Normal
+                : WindowState.Maximized;
+            return;
+        }
+
         try
         {
             DragMove();
         }
         catch
         {
-            // DragMove может упасть, если кнопку уже отпустили.
+        }
+    }
+
+    private void Close_Click(object sender, RoutedEventArgs e) =>
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+
+    private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
         }
     }
 }
