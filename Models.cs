@@ -97,7 +97,7 @@ public sealed class AppSettingsData
     public string YummyAnimeUserTokenEncrypted { get; set; } = "";
     public List<YummyAnimeFavorite> YummyAnimeFavorites { get; set; } = [];
     public List<YummyAnimeWatchEntry> YummyAnimeWatchHistory { get; set; } = [];
-    public bool VideoBlockAds { get; set; } = true;
+    public bool VideoBlockAds { get; set; }
     public bool VideoSkipOpening { get; set; } = true;
     public bool VideoAutoNextEpisode { get; set; } = true;
     public int VideoSkipOpeningSeconds { get; set; } = 90;

@@ -249,12 +249,6 @@
             </Grid>
 
             <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
-                <CheckBox x:Name="BlockAdsCheck"
-                          Content="Блок рекламы"
-                          Foreground="{StaticResource TextBrush}"
-                          Margin="0,0,16,0"
-                          Checked="PlayerOption_Changed"
-                          Unchecked="PlayerOption_Changed" />
                 <CheckBox x:Name="SkipOpeningCheck"
                           Content="Пропуск опенинга (~90с)"
                           Foreground="{StaticResource TextBrush}"
@@ -266,6 +260,11 @@
                           Foreground="{StaticResource TextBrush}"
                           Checked="PlayerOption_Changed"
                           Unchecked="PlayerOption_Changed" />
+                <TextBlock Text="Блок рекламы Kodik надёжно не встраивается — отключён"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="16,0,0,0" />
             </StackPanel>
 
             <Border x:Name="PlayerFrame"

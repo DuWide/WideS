@@ -33,7 +33,6 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
     private bool _advancingEpisode;
     private CatalogMode _catalogMode = CatalogMode.Catalog;
     private bool _webMessageHooked;
-    private bool _adFilterHooked;
     private string? _frameScriptId;
     private bool _disposed;
 
@@ -60,7 +59,6 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         }
 
         _updatingOptions = true;
-        BlockAdsCheck.IsChecked = _settings.VideoBlockAds;
         SkipOpeningCheck.IsChecked = _settings.VideoSkipOpening;
         AutoNextCheck.IsChecked = _settings.VideoAutoNextEpisode;
         _updatingOptions = false;
@@ -163,19 +161,6 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
                 _webMessageHooked = true;
             }
 
-            if (!_adFilterHooked)
-            {
-                Browser.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
-                Browser.CoreWebView2.WebResourceRequested += (_, args) =>
-                {
-                    if (!_settings.VideoBlockAds) return;
-                    if (!VideoAdBlocker.ShouldBlock(args.Request.Uri)) return;
-                    args.Response = Browser.CoreWebView2.Environment.CreateWebResourceResponse(
-                        null, 403, "Blocked", "Content-Type: text/plain");
-                };
-                _adFilterHooked = true;
-            }
-
             if (_frameScriptId is null)
             {
                 await InstallFrameScriptAsync();
@@ -207,14 +192,13 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             VideoPlayerScripts.BuildFrameEnhancements(
                 _settings.VideoSkipOpening,
                 _settings.VideoSkipOpeningSeconds <= 0 ? 90 : _settings.VideoSkipOpeningSeconds,
-                _settings.VideoBlockAds,
                 _settings.VideoAutoNextEpisode));
     }
 
     private async void PlayerOption_Changed(object sender, RoutedEventArgs e)
     {
         if (_updatingOptions) return;
-        _settings.VideoBlockAds = BlockAdsCheck.IsChecked == true;
+        _settings.VideoBlockAds = false;
         _settings.VideoSkipOpening = SkipOpeningCheck.IsChecked == true;
         _settings.VideoAutoNextEpisode = AutoNextCheck.IsChecked == true;
         _saveLocalData();
