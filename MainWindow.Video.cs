@@ -59,8 +59,7 @@ public partial class MainWindow
                     : SecretService.Protect(token);
                 _settingsStore.Save(_settings);
             },
-            _settings.YummyAnimeFavorites,
-            _settings.YummyAnimeWatchHistory,
+            _settings,
             () => _settingsStore.Save(_settings));
         _videoBrowserView.FullScreenChanged += HandleVideoFullScreenChanged;
         return _videoBrowserView;

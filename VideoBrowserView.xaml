@@ -186,6 +186,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="PlayerHeaderRow" Height="Auto" />
                 <RowDefinition x:Name="PlayerControlsRow" Height="Auto" />
+                <RowDefinition x:Name="PlayerOptionsRow" Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -216,7 +217,7 @@
                            VerticalAlignment="Center" />
             </DockPanel>
 
-            <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid Grid.Row="1" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="10" />
@@ -247,8 +248,28 @@
                 </StackPanel>
             </Grid>
 
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,10">
+                <CheckBox x:Name="BlockAdsCheck"
+                          Content="Блок рекламы"
+                          Foreground="{StaticResource TextBrush}"
+                          Margin="0,0,16,0"
+                          Checked="PlayerOption_Changed"
+                          Unchecked="PlayerOption_Changed" />
+                <CheckBox x:Name="SkipOpeningCheck"
+                          Content="Пропуск опенинга (~90с)"
+                          Foreground="{StaticResource TextBrush}"
+                          Margin="0,0,16,0"
+                          Checked="PlayerOption_Changed"
+                          Unchecked="PlayerOption_Changed" />
+                <CheckBox x:Name="AutoNextCheck"
+                          Content="След. серия"
+                          Foreground="{StaticResource TextBrush}"
+                          Checked="PlayerOption_Changed"
+                          Unchecked="PlayerOption_Changed" />
+            </StackPanel>
+
             <Border x:Name="PlayerFrame"
-                    Grid.Row="2"
+                    Grid.Row="3"
                     Background="#FF000000"
                     BorderBrush="{DynamicResource BorderSubtleBrush}"
                     BorderThickness="1"

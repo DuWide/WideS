@@ -19,6 +19,7 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
     private readonly Action<string> _saveUserToken;
     private readonly List<YummyAnimeFavorite> _favorites;
     private readonly List<YummyAnimeWatchEntry> _watchHistory;
+    private readonly AppSettingsData _settings;
     private readonly Action _saveLocalData;
     private readonly HashSet<int> _watchedVideoIds = [];
     private Task? _initializationTask;
@@ -28,8 +29,12 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
     private YummyAnimeFavorite? _selectedFavorite;
     private CancellationTokenSource? _loadCancellation;
     private bool _updatingFilters;
+    private bool _updatingOptions;
+    private bool _advancingEpisode;
     private CatalogMode _catalogMode = CatalogMode.Catalog;
     private bool _webMessageHooked;
+    private bool _adFilterHooked;
+    private string? _frameScriptId;
     private bool _disposed;
 
     public bool IsMiniMode { get; private set; }
@@ -40,19 +45,25 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         string applicationToken,
         string userToken,
         Action<string> saveUserToken,
-        List<YummyAnimeFavorite> favorites,
-        List<YummyAnimeWatchEntry> watchHistory,
+        AppSettingsData settings,
         Action saveLocalData)
     {
         InitializeComponent();
         _saveUserToken = saveUserToken;
-        _favorites = favorites;
-        _watchHistory = watchHistory;
+        _settings = settings;
+        _favorites = settings.YummyAnimeFavorites;
+        _watchHistory = settings.YummyAnimeWatchHistory;
         _saveLocalData = saveLocalData;
         foreach (var entry in _watchHistory)
         {
             if (entry.VideoId > 0) _watchedVideoIds.Add(entry.VideoId);
         }
+
+        _updatingOptions = true;
+        BlockAdsCheck.IsChecked = _settings.VideoBlockAds;
+        SkipOpeningCheck.IsChecked = _settings.VideoSkipOpening;
+        AutoNextCheck.IsChecked = _settings.VideoAutoNextEpisode;
+        _updatingOptions = false;
 
         if (!string.IsNullOrWhiteSpace(applicationToken))
         {
@@ -133,12 +144,41 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             {
                 Browser.CoreWebView2.WebMessageReceived += (_, args) =>
                 {
-                    if (string.Equals(args.TryGetWebMessageAsString(), "drag", StringComparison.OrdinalIgnoreCase))
+                    var message = args.TryGetWebMessageAsString();
+                    if (string.Equals(message, "drag", StringComparison.OrdinalIgnoreCase))
                     {
                         DragRequested?.Invoke();
+                        return;
+                    }
+                    if (string.Equals(message, "skipped_op", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Dispatcher.Invoke(() => PlayerStatus.Text = "Опенинг пропущен");
+                        return;
+                    }
+                    if (string.Equals(message, "ended", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Dispatcher.Invoke(() => _ = TryPlayNextEpisodeAsync());
                     }
                 };
                 _webMessageHooked = true;
+            }
+
+            if (!_adFilterHooked)
+            {
+                Browser.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
+                Browser.CoreWebView2.WebResourceRequested += (_, args) =>
+                {
+                    if (!_settings.VideoBlockAds) return;
+                    if (!VideoAdBlocker.ShouldBlock(args.Request.Uri)) return;
+                    args.Response = Browser.CoreWebView2.Environment.CreateWebResourceResponse(
+                        null, 403, "Blocked", "Content-Type: text/plain");
+                };
+                _adFilterHooked = true;
+            }
+
+            if (_frameScriptId is null)
+            {
+                await InstallFrameScriptAsync();
             }
         }
         catch (Exception ex)
@@ -146,6 +186,65 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
             LoadingTitle.Text = "WebView2 не запустился";
             LoadingText.Text = ex.Message;
         }
+    }
+
+    private async Task InstallFrameScriptAsync()
+    {
+        if (Browser.CoreWebView2 is null) return;
+        if (_frameScriptId is not null)
+        {
+            try
+            {
+                Browser.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(_frameScriptId);
+            }
+            catch
+            {
+            }
+            _frameScriptId = null;
+        }
+
+        _frameScriptId = await Browser.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+            VideoPlayerScripts.BuildFrameEnhancements(
+                _settings.VideoSkipOpening,
+                _settings.VideoSkipOpeningSeconds <= 0 ? 90 : _settings.VideoSkipOpeningSeconds,
+                _settings.VideoBlockAds,
+                _settings.VideoAutoNextEpisode));
+    }
+
+    private async void PlayerOption_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_updatingOptions) return;
+        _settings.VideoBlockAds = BlockAdsCheck.IsChecked == true;
+        _settings.VideoSkipOpening = SkipOpeningCheck.IsChecked == true;
+        _settings.VideoAutoNextEpisode = AutoNextCheck.IsChecked == true;
+        _saveLocalData();
+        await InstallFrameScriptAsync();
+        PlayerStatus.Text = "Настройки сохранены. Применится на следующей серии/перезагрузке.";
+    }
+
+    private async Task TryPlayNextEpisodeAsync()
+    {
+        if (!_settings.VideoAutoNextEpisode || _advancingEpisode) return;
+        if (EpisodeBox.Items.Count == 0) return;
+
+        var index = EpisodeBox.SelectedIndex;
+        if (index < 0 || index >= EpisodeBox.Items.Count - 1)
+        {
+            PlayerStatus.Text = "Это последняя серия";
+            return;
+        }
+
+        _advancingEpisode = true;
+        try
+        {
+            PlayerStatus.Text = "Следующая серия…";
+            EpisodeBox.SelectedIndex = index + 1;
+        }
+        finally
+        {
+            _advancingEpisode = false;
+        }
+        await Task.CompletedTask;
     }
 
     private async void Search_Click(object sender, RoutedEventArgs e)
@@ -752,6 +851,7 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         PlayerScreen.Visibility = Visibility.Visible;
         PlayerHeaderRow.Height = new GridLength(0);
         PlayerControlsRow.Height = new GridLength(0);
+        PlayerOptionsRow.Height = new GridLength(0);
         LoginStatus.Visibility = Visibility.Collapsed;
         PlayerFrame.BorderThickness = new Thickness(0);
         PlayerFrame.CornerRadius = new CornerRadius(0);
@@ -771,6 +871,7 @@ public partial class VideoBrowserView : System.Windows.Controls.UserControl, IDi
         }
         PlayerHeaderRow.Height = GridLength.Auto;
         PlayerControlsRow.Height = GridLength.Auto;
+        PlayerOptionsRow.Height = GridLength.Auto;
         LoginStatus.Visibility = CatalogScreen.Visibility == Visibility.Visible
             ? Visibility.Visible
             : Visibility.Collapsed;
