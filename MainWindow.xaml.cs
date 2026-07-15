@@ -103,6 +103,7 @@ public partial class MainWindow : Window
         LoadData();
         AfterLoadData();
         BuildNavGrouped();
+        InitializeVideoLifecycle();
         SetupTrayIcon();
         _taskTimer.Tick += (_, _) => CheckTaskReminders();
         _taskTimer.Start();
@@ -448,6 +449,7 @@ public partial class MainWindow : Window
         "settings" => "nav-settings",
         "clipboard" => "nav-clipboard",
         "pulse" => "nav-pulse",
+        "video" => "nav-video",
         "favorites" => "star",
         _ => "nav-home"
     };
@@ -517,6 +519,7 @@ public partial class MainWindow : Window
             "settings"    => "settings",
             "clipboard"   => "clipboard",
             "pulse"       => "pulse",
+            "video"       => "video",
             _ => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase) ? "projects" : null
         };
         var topKey = key is "notes" or "connections" or "tasks" or "dropzone" or "favorites" ? key : null;
@@ -606,6 +609,7 @@ public partial class MainWindow : Window
         RemoveClipboardFormatListener(handle);
         _hwndSource?.RemoveHook(WndProc);
         _dockWindow?.Close();
+        ShutdownVideoBrowser();
         _pulseTimer.Stop();
         _clipboardCaptureTimer.Stop();
         _trayIcon?.Dispose();
@@ -806,6 +810,7 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
+        FloatVideoIfAvailable();
         Hide();
     }
 
@@ -869,6 +874,11 @@ public partial class MainWindow : Window
             _forwardStack.Clear();
         }
 
+        if (_currentViewKey == "video" && key != "video")
+        {
+            FloatVideoIfAvailable();
+        }
+
         _currentViewKey = key;
         if (IsTabView(key) && !_openTabs.Contains(key))
         {
@@ -925,6 +935,7 @@ public partial class MainWindow : Window
                 case "settings": ShowSettings(); break;
                 case "clipboard": ShowClipboardHistory(); break;
                 case "pulse": ShowPulse(); break;
+                case "video": ShowVideo(); break;
                 default: ShowHome(); break;
             }
         }

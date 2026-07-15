@@ -22,6 +22,7 @@ public static class UiIconFactory
             "nav-backup" => 0xE896,
             "nav-dropzone" or "drop" => 0xE898,
             "nav-settings" => 0xE713, "nav-clipboard" => 0xE77F, "nav-pulse" => 0xE9D9,
+            "nav-video" => 0xE8B2,
             "copy" => 0xE8C8, "cpu" => 0xE950, "memory" => 0xE7F8, "disk" => 0xEDA2,
             "more" => 0xE712, "search" => 0xE721,
             "dock" or "open" => 0xE7F4,

@@ -106,6 +106,7 @@ public partial class MainWindow
         AddNav("Буфер", "clipboard", ShowClipboardHistory);
         AddNav("Пульс", "pulse", ShowPulse);
         AddNav("Браузер", "ai", ShowAiAgents);
+        AddNav("Плеер", "video", ShowVideo);
 
         AddNavGroup("ИНСТРУМЕНТЫ");
         AddNav("Команды", "commands", ShowCommandRecipes);

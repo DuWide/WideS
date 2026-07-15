@@ -93,6 +93,8 @@ public sealed class AppSettingsData
     public int PortalPort { get; set; } = 7788;
     public bool ClipboardScreenshotPrompt { get; set; } = true;
     public bool ClipboardHistoryEnabled { get; set; } = true;
+    public string YummyAnimeAppTokenEncrypted { get; set; } = "";
+    public string YummyAnimeUserTokenEncrypted { get; set; } = "";
 }
 
 public sealed record SelectOption(string Label, string Value)

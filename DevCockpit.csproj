@@ -12,7 +12,7 @@
     <Product>WideS</Product>
     <AssemblyTitle>WideS</AssemblyTitle>
     <ApplicationIcon>Assets\WideS.ico</ApplicationIcon>
-    <Version>1.5.6</Version>
+    <Version>1.6.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +23,7 @@
     </Content>
     <Compile Remove="legacy\**" />
     <Compile Remove="for-claude\**" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
     <Page Remove="for-claude\**" />
     <ApplicationDefinition Remove="for-claude\**" />
     <Resource Include="Assets\WideS.ico" />
@@ -31,26 +32,18 @@
 
   <Target Name="PrepareProjectsJsonPreservation" BeforeTargets="Publish">
     <MakeDir Directories="$(IntermediateOutputPath)publish-preserve" />
-    <Delete Files="$(IntermediateOutputPath)publish-preserve\projects.json"
-            Condition="!Exists('$(PublishDir)data\projects.json') And Exists('$(IntermediateOutputPath)publish-preserve\projects.json')" />
-    <Copy SourceFiles="$(PublishDir)data\projects.json"
-          DestinationFiles="$(IntermediateOutputPath)publish-preserve\projects.json"
-          Condition="Exists('$(PublishDir)data\projects.json')" />
+    <Delete Files="$(IntermediateOutputPath)publish-preserve\projects.json" Condition="!Exists('$(PublishDir)data\projects.json') And Exists('$(IntermediateOutputPath)publish-preserve\projects.json')" />
+    <Copy SourceFiles="$(PublishDir)data\projects.json" DestinationFiles="$(IntermediateOutputPath)publish-preserve\projects.json" Condition="Exists('$(PublishDir)data\projects.json')" />
   </Target>
 
   <Target Name="RestoreOrCreateProjectsJsonOnPublish" AfterTargets="Publish">
     <MakeDir Directories="$(PublishDir)data" />
-    <Copy SourceFiles="$(IntermediateOutputPath)publish-preserve\projects.json"
-          DestinationFiles="$(PublishDir)data\projects.json"
-          Condition="Exists('$(IntermediateOutputPath)publish-preserve\projects.json')" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\data\projects.json"
-          DestinationFiles="$(PublishDir)data\projects.json"
-          Condition="'$(SelfContained)' != 'true' And !Exists('$(PublishDir)data\projects.json')" />
+    <Copy SourceFiles="$(IntermediateOutputPath)publish-preserve\projects.json" DestinationFiles="$(PublishDir)data\projects.json" Condition="Exists('$(IntermediateOutputPath)publish-preserve\projects.json')" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\data\projects.json" DestinationFiles="$(PublishDir)data\projects.json" Condition="'$(SelfContained)' != 'true' And !Exists('$(PublishDir)data\projects.json')" />
   </Target>
 
   <Target Name="CopyVersionedApplicationIcon" AfterTargets="Publish">
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Assets\WideS.ico"
-          DestinationFiles="$(PublishDir)WideS-$(Version).ico" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Assets\WideS.ico" DestinationFiles="$(PublishDir)WideS-$(Version).ico" />
   </Target>
 
 </Project>

@@ -29,6 +29,7 @@ public static class AppPaths
     public static string ProjectTemplatesJson => Path.Combine(DataDirectory, "project-templates.json");
     public static string ClipboardHistoryJson => Path.Combine(DataDirectory, "clipboard-history.json");
     public static string ClipboardImagesDirectory => Path.Combine(DataDirectory, "clipboard-images");
+    public static string VideoWebViewDataDirectory => Path.Combine(DataDirectory, "video-webview");
 
     public static void EnsureDataDirectory()
     {
@@ -45,6 +46,7 @@ public static class AppPaths
         MigrateIfMissing("project-templates.json");
         MigrateIfMissing("clipboard-history.json");
         Directory.CreateDirectory(ClipboardImagesDirectory);
+        Directory.CreateDirectory(VideoWebViewDataDirectory);
     }
 
     private static void MigrateFromLegacyAppData()

@@ -1,5 +1,5 @@
 #define MyAppName "WideS"
-#define MyAppVersion "1.5.6"
+#define MyAppVersion "1.6.0"
 #define MyAppPublisher "WideS"
 #define MyAppExeName "WideS.exe"
 #define MyAppSource "WideS-Setup\app"

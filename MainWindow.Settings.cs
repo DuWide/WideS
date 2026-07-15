@@ -104,6 +104,47 @@ public partial class MainWindow
         card.Child = stack;
         panel.Children.Add(card);
 
+        var yummyCard = Card("YummyAnime");
+        yummyCard.Width = 720;
+        var yummyStack = BaseCardStack("YummyAnime");
+        yummyStack.Children.Add(Muted("Публичный X-Application token приложения. Приватный токен сюда не вводите."));
+        var yummyToken = new PasswordBox
+        {
+            Margin = new Thickness(0, 8, 0, 8),
+            MinWidth = 520,
+            Padding = new Thickness(10),
+            Background = (WpfBrush)FindResource("PanelBrush"),
+            Foreground = (WpfBrush)FindResource("TextBrush")
+        };
+        if (!string.IsNullOrWhiteSpace(SecretService.Unprotect(_settings.YummyAnimeAppTokenEncrypted)))
+        {
+            yummyToken.Password = "********";
+        }
+        yummyStack.Children.Add(yummyToken);
+        yummyStack.Children.Add(Muted("Логин пользователя выполняется в разделе «Плеер». Пароль не сохраняется; токен аккаунта защищён DPAPI."));
+        var yummyButtons = new WrapPanel();
+        yummyButtons.Children.Add(ActionButton("Сохранить токен", () =>
+        {
+            if (!string.IsNullOrWhiteSpace(yummyToken.Password) && yummyToken.Password != "********")
+            {
+                _settings.YummyAnimeAppTokenEncrypted = SecretService.Protect(yummyToken.Password.Trim());
+                _settings.YummyAnimeUserTokenEncrypted = "";
+            }
+            _settingsStore.Save(_settings);
+            ResetVideoBrowser();
+            AddLog("OK", "Токен YummyAnime сохранён.");
+        }, false));
+        yummyButtons.Children.Add(ActionButton("Открыть приложения YummyAnime", () =>
+        {
+            Process.Start(new ProcessStartInfo("https://yummyani.me/dev/applications")
+            {
+                UseShellExecute = true
+            });
+        }, false));
+        yummyStack.Children.Add(yummyButtons);
+        yummyCard.Child = yummyStack;
+        panel.Children.Add(yummyCard);
+
         var hotkeys = Card("Горячие клавиши");
         hotkeys.Width = 720;
         var hotkeysStack = BaseCardStack("Горячие клавиши");
