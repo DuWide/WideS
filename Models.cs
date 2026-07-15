@@ -95,6 +95,44 @@ public sealed class AppSettingsData
     public bool ClipboardHistoryEnabled { get; set; } = true;
     public string YummyAnimeAppTokenEncrypted { get; set; } = "";
     public string YummyAnimeUserTokenEncrypted { get; set; } = "";
+    public List<YummyAnimeFavorite> YummyAnimeFavorites { get; set; } = [];
+    public List<YummyAnimeWatchEntry> YummyAnimeWatchHistory { get; set; } = [];
+}
+
+public sealed class YummyAnimeFavorite
+{
+    public int AnimeId { get; set; }
+    public string Title { get; set; } = "";
+    public string Subtitle { get; set; } = "";
+    public string PosterUrl { get; set; } = "";
+}
+
+public sealed class YummyAnimeWatchEntry
+{
+    public int VideoId { get; set; }
+    public int AnimeId { get; set; }
+    public string AnimeTitle { get; set; } = "";
+    public string Episode { get; set; } = "";
+    public string Dubbing { get; set; } = "";
+    public string Player { get; set; } = "";
+    public string PosterUrl { get; set; } = "";
+    public int ProgressSeconds { get; set; }
+    public int DurationSeconds { get; set; }
+    public DateTime WatchedAt { get; set; } = DateTime.Now;
+
+    public string Title => AnimeTitle;
+    public string Subtitle
+    {
+        get
+        {
+            var progress = DurationSeconds > 0
+                ? $"{ProgressSeconds / 60}:{ProgressSeconds % 60:D2} / {DurationSeconds / 60}:{DurationSeconds % 60:D2}"
+                : Episode;
+            return string.IsNullOrWhiteSpace(Episode)
+                ? $"{progress} · {WatchedAt:dd.MM HH:mm}"
+                : $"{Episode} · {progress} · {WatchedAt:dd.MM HH:mm}";
+        }
+    }
 }
 
 public sealed record SelectOption(string Label, string Value)

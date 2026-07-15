@@ -4,174 +4,251 @@
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
              MinHeight="620">
     <Grid x:Name="RootGrid">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="CatalogColumn" Width="310" />
-            <ColumnDefinition Width="12" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <Border x:Name="CatalogPanel"
-                Background="{StaticResource CardBrush}"
-                BorderBrush="{DynamicResource BorderSubtleBrush}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <StackPanel>
-                    <TextBlock Text="Каталог YummyAnime"
-                               Foreground="{StaticResource TextBrush}"
-                               FontWeight="SemiBold"
-                               FontSize="16" />
-                    <Grid Margin="0,10,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="SearchBox"
-                                 MinHeight="36"
-                                 Padding="9,6"
-                                 KeyDown="SearchBox_KeyDown"
-                                 ToolTip="Название аниме или сериала" />
-                        <Button Grid.Column="1"
-                                Content="Найти"
-                                Style="{StaticResource PrimaryButton}"
-                                Margin="6,0,0,0"
-                                Click="Search_Click" />
-                    </Grid>
-                    <TextBlock x:Name="CatalogStatus"
-                               Foreground="{StaticResource MutedBrush}"
-                               FontSize="12"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,8" />
-                </StackPanel>
-
-                <Expander x:Name="LoginPanel"
-                          Grid.Row="1"
-                          Header="Аккаунт YummyAnime"
-                          IsExpanded="False"
-                          Foreground="{StaticResource TextBrush}"
-                          Margin="0,0,0,10">
-                    <StackPanel Margin="0,8,0,0">
-                        <TextBox x:Name="LoginBox"
-                                 MinHeight="34"
-                                 Padding="8,5"
-                                 ToolTip="E-mail или логин" />
-                        <PasswordBox x:Name="PasswordBox"
-                                     MinHeight="34"
-                                     Padding="8,5"
-                                     Margin="0,6,0,6"
-                                     ToolTip="Пароль" />
-                        <Button x:Name="LoginButton"
-                                Content="Войти"
-                                Style="{StaticResource GhostButton}"
-                                Click="Login_Click" />
-                        <TextBlock x:Name="LoginStatus"
-                                   Foreground="{StaticResource MutedBrush}"
-                                   FontSize="12"
-                                   TextWrapping="Wrap"
-                                   Margin="0,7,0,0" />
-                    </StackPanel>
-                </Expander>
-
-                <ListBox x:Name="AnimeList"
-                         Grid.Row="2"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         SelectionChanged="AnimeList_SelectionChanged"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="4,5" MaxWidth="260">
-                                <TextBlock Text="{Binding Title}"
-                                           Foreground="{StaticResource TextBrush}"
-                                           FontWeight="SemiBold"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Subtitle}"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           FontSize="12"
-                                           Margin="0,3,0,0" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </Grid>
-        </Border>
-
-        <Grid x:Name="PlayerPanel" Grid.Column="2">
+        <Grid x:Name="CatalogScreen">
             <Grid.RowDefinitions>
-                <RowDefinition x:Name="PlayerHeaderRow" Height="Auto" />
-                <RowDefinition x:Name="PlayerControlsRow" Height="Auto" />
-                <RowDefinition x:Name="EpisodeRow" Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <DockPanel Margin="2,0,2,8">
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox"
+                         MinHeight="38"
+                         Padding="10,7"
+                         KeyDown="SearchBox_KeyDown"
+                         ToolTip="Название аниме или сериала" />
+                <Button Grid.Column="1"
+                        Content="Найти"
+                        Style="{StaticResource PrimaryButton}"
+                        Margin="8,0,0,0"
+                        MinWidth="88"
+                        Click="Search_Click" />
+            </Grid>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+                <Button x:Name="CatalogTabButton"
+                        Content="Каталог"
+                        Style="{StaticResource PrimaryButton}"
+                        MinWidth="110"
+                        Margin="0,0,8,0"
+                        Click="CatalogTab_Click" />
+                <Button x:Name="FavoritesTabButton"
+                        Content="Избранное"
+                        Style="{StaticResource GhostButton}"
+                        MinWidth="110"
+                        Margin="0,0,8,0"
+                        Click="FavoritesTab_Click" />
+                <Button x:Name="HistoryTabButton"
+                        Content="История"
+                        Style="{StaticResource GhostButton}"
+                        MinWidth="110"
+                        Margin="0,0,8,0"
+                        Click="HistoryTab_Click" />
+                <Button x:Name="SyncTabButton"
+                        Content="Синхронизация"
+                        Style="{StaticResource GhostButton}"
+                        MinWidth="130"
+                        Click="AccountPanel_Click" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Margin="0,0,0,8">
+                <Border x:Name="AccountPanel"
+                        Background="{StaticResource CardBrush}"
+                        BorderBrush="{DynamicResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="16"
+                        Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Синхронизация с аккаунтом YummyAnime"
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontSize="16"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="Нужно только если хотите отмечать просмотренные серии и избранное на сайте YummyAnime. Без входа WideS всё равно сохраняет историю локально на этом ПК." />
+                        <TextBlock Margin="0,6,0,14"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="Пароль не сохраняется. После входа WideS хранит только защищённый токен (DPAPI) для API." />
+
+                        <TextBlock Text="E-mail аккаунта YummyAnime"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   Margin="0,0,0,4" />
+                        <TextBox x:Name="LoginBox"
+                                 MinHeight="38"
+                                 Padding="10,8"
+                                 Margin="0,0,0,10" />
+
+                        <TextBlock Text="Пароль"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   Margin="0,0,0,4" />
+                        <PasswordBox x:Name="PasswordBox"
+                                     MinHeight="38"
+                                     Padding="10,8"
+                                     Margin="0,0,0,12" />
+
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="LoginButton"
+                                    Content="Войти и синхронизировать"
+                                    Style="{StaticResource PrimaryButton}"
+                                    MinWidth="210"
+                                    Click="Login_Click" />
+                            <Button x:Name="LogoutButton"
+                                    Content="Выйти"
+                                    Style="{StaticResource GhostButton}"
+                                    Margin="8,0,0,0"
+                                    MinWidth="90"
+                                    Click="Logout_Click" />
+                        </StackPanel>
+                        <TextBlock x:Name="AccountHint"
+                                   Margin="0,10,0,0"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <TextBlock x:Name="CatalogStatus"
+                           Foreground="{StaticResource MutedBrush}"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="CatalogItems">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="156"
+                                    Margin="0,0,12,14"
+                                    Background="{StaticResource CardBrush}"
+                                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="CatalogItem_Click">
+                                <StackPanel>
+                                    <Grid Height="220">
+                                        <Border Background="{StaticResource PanelBrush}"
+                                                CornerRadius="8,8,0,0"
+                                                ClipToBounds="True">
+                                            <Image Source="{Binding PosterUrl}"
+                                                   Stretch="UniformToFill"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                        </Border>
+                                        <Button Content="★"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="6"
+                                                Width="30"
+                                                Height="30"
+                                                Padding="0"
+                                                Tag="{Binding}"
+                                                Style="{StaticResource GhostButton}"
+                                                Click="FavoriteButton_Click"
+                                                ToolTip="В избранное" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding Title}"
+                                               Foreground="{StaticResource TextBrush}"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"
+                                               MaxHeight="42"
+                                               Margin="10,8,10,0" />
+                                    <TextBlock Text="{Binding Subtitle}"
+                                               Foreground="{StaticResource MutedBrush}"
+                                               FontSize="12"
+                                               Margin="10,4,10,10" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <Grid x:Name="PlayerScreen" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="PlayerHeaderRow" Height="Auto" />
+                <RowDefinition x:Name="PlayerControlsRow" Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Margin="0,0,0,10">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button Content="← Каталог"
+                            Style="{StaticResource GhostButton}"
+                            Margin="0,0,8,0"
+                            Click="BackToCatalog_Click" />
+                    <Button x:Name="FavoriteToggleButton"
+                            Content="☆"
+                            Style="{StaticResource GhostButton}"
+                            Width="38"
+                            ToolTip="Избранное"
+                            Click="FavoriteToggleButton_Click" />
+                </StackPanel>
                 <TextBlock x:Name="PlayerStatus"
                            DockPanel.Dock="Right"
                            Foreground="{StaticResource MutedBrush}"
-                           VerticalAlignment="Center" />
+                           VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
                 <TextBlock x:Name="SelectedAnimeTitle"
-                           Text="Выберите аниме в каталоге"
+                           Text="Аниме"
                            Foreground="{StaticResource TextBrush}"
                            FontSize="18"
                            FontWeight="SemiBold"
-                           TextTrimming="CharacterEllipsis" />
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
             </DockPanel>
 
-            <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid Grid.Row="1" Margin="0,0,0,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="Озвучка" Foreground="{StaticResource MutedBrush}" FontSize="12" />
                     <ComboBox x:Name="DubbingBox"
                               Margin="0,4,0,0"
-                              MinHeight="34"
+                              MinHeight="36"
                               SelectionChanged="DubbingBox_SelectionChanged" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <TextBlock Text="Плеер" Foreground="{StaticResource MutedBrush}" FontSize="12" />
                     <ComboBox x:Name="PlayerBox"
                               Margin="0,4,0,0"
-                              MinHeight="34"
+                              MinHeight="36"
                               SelectionChanged="PlayerBox_SelectionChanged" />
+                </StackPanel>
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="Серия" Foreground="{StaticResource MutedBrush}" FontSize="12" />
+                    <ComboBox x:Name="EpisodeBox"
+                              Margin="0,4,0,0"
+                              MinHeight="36"
+                              SelectionChanged="EpisodeBox_SelectionChanged" />
                 </StackPanel>
             </Grid>
 
-            <ListBox x:Name="EpisodeList"
-                     Grid.Row="2"
-                     Height="46"
-                     Margin="0,0,0,8"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                     SelectionChanged="EpisodeList_SelectionChanged">
-                <ListBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ListBox.ItemsPanel>
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <Border Padding="9,6" Margin="2" CornerRadius="4"
-                                Background="{StaticResource PanelBrush}">
-                            <TextBlock Text="{Binding DisplayTitle}"
-                                       Foreground="{StaticResource TextBrush}" />
-                        </Border>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-
-            <Border Grid.Row="3"
+            <Border x:Name="PlayerFrame"
+                    Grid.Row="2"
                     Background="#FF000000"
                     BorderBrush="{DynamicResource BorderSubtleBrush}"
                     BorderThickness="1"
@@ -188,7 +265,7 @@
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center" />
                             <TextBlock x:Name="LoadingText"
-                                       Text="Найдите аниме и выберите серию"
+                                       Text="Выберите серию"
                                        Foreground="{StaticResource MutedBrush}"
                                        Margin="0,10,0,0"
                                        TextWrapping="Wrap"
@@ -199,5 +276,12 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <TextBlock x:Name="LoginStatus"
+                   VerticalAlignment="Bottom"
+                   Foreground="{StaticResource MutedBrush}"
+                   FontSize="12"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,4" />
     </Grid>
 </UserControl>

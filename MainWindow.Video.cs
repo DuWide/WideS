@@ -9,28 +9,39 @@ public partial class MainWindow
 
     private void InitializeVideoLifecycle()
     {
-        StateChanged += (_, _) =>
+        StateChanged += async (_, _) =>
         {
             if (WindowState == System.Windows.WindowState.Minimized)
             {
                 FloatVideoIfAvailable();
+                return;
             }
+
+            await TryRestoreVideoToMainAsync();
         };
-        Activated += async (_, _) =>
+        IsVisibleChanged += async (_, e) =>
         {
-            if (_currentViewKey == "video" && WindowState != System.Windows.WindowState.Minimized)
+            if (e.NewValue is true)
             {
-                await RestoreVideoToMainAsync();
+                await TryRestoreVideoToMainAsync();
             }
         };
+        Activated += async (_, _) => await TryRestoreVideoToMainAsync();
+    }
+
+    private async Task TryRestoreVideoToMainAsync()
+    {
+        if (!IsVisible || WindowState == System.Windows.WindowState.Minimized) return;
+        if (_currentViewKey != "video" || _videoBrowserView?.IsMiniMode != true) return;
+        await RestoreVideoToMainAsync();
     }
 
     private async void ShowVideo()
     {
         EnterView("video");
-        SetTitle("Плеер", "YummyAnime: каталог, вход, история просмотров и автоматический мини-плеер");
+        SetTitle("Плеер", "YummyAnime: каталог, избранное, серии и автоматический мини-плеер");
         EnsureVideoBrowserView();
-        await RestoreVideoToMainAsync();
+        await RestoreVideoToMainAsync(forceAttach: true);
     }
 
     private VideoBrowserView EnsureVideoBrowserView()
@@ -38,13 +49,19 @@ public partial class MainWindow
         if (_videoBrowserView is not null) return _videoBrowserView;
         var applicationToken = SecretService.Unprotect(_settings.YummyAnimeAppTokenEncrypted);
         var userToken = SecretService.Unprotect(_settings.YummyAnimeUserTokenEncrypted);
-        _videoBrowserView = new VideoBrowserView(applicationToken, userToken, token =>
-        {
-            _settings.YummyAnimeUserTokenEncrypted = string.IsNullOrWhiteSpace(token)
-                ? ""
-                : SecretService.Protect(token);
-            _settingsStore.Save(_settings);
-        });
+        _videoBrowserView = new VideoBrowserView(
+            applicationToken,
+            userToken,
+            token =>
+            {
+                _settings.YummyAnimeUserTokenEncrypted = string.IsNullOrWhiteSpace(token)
+                    ? ""
+                    : SecretService.Protect(token);
+                _settingsStore.Save(_settings);
+            },
+            _settings.YummyAnimeFavorites,
+            _settings.YummyAnimeWatchHistory,
+            () => _settingsStore.Save(_settings));
         _videoBrowserView.FullScreenChanged += HandleVideoFullScreenChanged;
         return _videoBrowserView;
     }
@@ -120,9 +137,11 @@ public partial class MainWindow
         return window;
     }
 
-    private async Task RestoreVideoToMainAsync()
+    private async Task RestoreVideoToMainAsync(bool forceAttach = false)
     {
         if (_changingVideoHost || _videoBrowserView is null) return;
+        if (!forceAttach && !_videoBrowserView.IsMiniMode) return;
+
         _changingVideoHost = true;
         try
         {

@@ -116,15 +116,40 @@ public sealed class YummyAnimeService : IDisposable
         return UserToken;
     }
 
+    public async Task AddFavoriteAsync(int animeId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(UserToken)) return;
+        await SendRawAsync(
+            HttpMethod.Put,
+            $"/anime/{animeId}/list/fav",
+            new { date = DateTimeOffset.UtcNow.ToUnixTimeSeconds() },
+            requiresUser: true,
+            cancellationToken);
+    }
+
+    public async Task RemoveFavoriteAsync(int animeId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(UserToken)) return;
+        await SendRawAsync(
+            HttpMethod.Delete,
+            $"/anime/{animeId}/list/fav",
+            null,
+            requiresUser: true,
+            cancellationToken);
+    }
+
     public async Task MarkWatchedAsync(
         YummyAnimeVideo video,
+        int progressSeconds = 0,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(UserToken)) return;
+        var duration = Math.Max(0, (int)video.Duration);
+        var time = Math.Clamp(progressSeconds, 0, duration > 0 ? duration : progressSeconds);
         var body = new
         {
-            time = 0,
-            duration = Math.Max(0, (int)video.Duration),
+            time,
+            duration,
             date = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             times = Array.Empty<int>()
         };
@@ -134,6 +159,58 @@ public sealed class YummyAnimeService : IDisposable
             body,
             requiresUser: true,
             cancellationToken);
+    }
+
+    public async Task<HashSet<int>> GetWatchedVideoIdsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = new HashSet<int>();
+        if (string.IsNullOrWhiteSpace(UserToken)) return result;
+
+        foreach (var route in new[] { "/video/watch-history", "/video/last-watches" })
+        {
+            try
+            {
+                using var document = await SendRawAsync(
+                    HttpMethod.Get,
+                    route,
+                    null,
+                    requiresUser: true,
+                    cancellationToken);
+                CollectVideoIds(document.RootElement, result);
+            }
+            catch (YummyAnimeException)
+            {
+                // История опциональна: локальные отметки всё равно работают.
+            }
+        }
+
+        return result;
+    }
+
+    private static void CollectVideoIds(JsonElement element, HashSet<int> result)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if ((property.NameEquals("video_id") || property.NameEquals("id")) &&
+                        property.Value.ValueKind == JsonValueKind.Number &&
+                        property.Value.TryGetInt32(out var id) &&
+                        id > 0)
+                    {
+                        result.Add(id);
+                    }
+                    CollectVideoIds(property.Value, result);
+                }
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    CollectVideoIds(item, result);
+                }
+                break;
+        }
     }
 
     private async Task<T> SendAsync<T>(
@@ -273,6 +350,9 @@ public sealed class YummyAnimeItem
     [JsonPropertyName("season")]
     public int? Season { get; set; }
 
+    [JsonPropertyName("poster")]
+    public YummyAnimePoster Poster { get; set; } = new();
+
     public string Subtitle
     {
         get
@@ -282,6 +362,47 @@ public sealed class YummyAnimeItem
             if (Season is > 0) parts.Add($"сезон {Season}");
             return parts.Count == 0 ? "YummyAnime" : string.Join(" · ", parts);
         }
+    }
+
+    public string PosterUrl => YummyAnimePoster.Normalize(Poster.Medium, Poster.Big, Poster.Full);
+
+    public YummyAnimeFavorite ToFavorite() => new()
+    {
+        AnimeId = AnimeId,
+        Title = Title,
+        Subtitle = Subtitle,
+        PosterUrl = PosterUrl
+    };
+}
+
+public sealed class YummyAnimePoster
+{
+    [JsonPropertyName("medium")]
+    public string Medium { get; set; } = "";
+
+    [JsonPropertyName("big")]
+    public string Big { get; set; } = "";
+
+    [JsonPropertyName("full")]
+    public string Full { get; set; } = "";
+
+    public static string Normalize(params string[] values)
+    {
+        foreach (var value in values)
+        {
+            var normalized = NormalizeOne(value);
+            if (!string.IsNullOrWhiteSpace(normalized)) return normalized;
+        }
+        return "";
+    }
+
+    private static string NormalizeOne(string value)
+    {
+        value = value.Trim();
+        if (string.IsNullOrWhiteSpace(value)) return "";
+        if (value.StartsWith("//", StringComparison.Ordinal)) return "https:" + value;
+        if (value.StartsWith("/", StringComparison.Ordinal)) return "https://api.yani.tv" + value;
+        return value;
     }
 }
 
@@ -314,6 +435,10 @@ public sealed class YummyAnimeVideo
     public string Dubbing => string.IsNullOrWhiteSpace(Data.Dubbing) ? "Без указания" : Data.Dubbing;
     public string Player => string.IsNullOrWhiteSpace(Data.Player) ? "Плеер" : Data.Player;
     public string DisplayTitle => string.IsNullOrWhiteSpace(Number) ? "Серия" : $"Серия {Number}";
+    public bool IsWatched { get; set; }
+    public string ListTitle => IsWatched ? $"✓ {DisplayTitle}" : DisplayTitle;
+
+    public override string ToString() => ListTitle;
 
     public Uri? GetPlayerUri()
     {

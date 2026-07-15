@@ -5,28 +5,14 @@
         Icon="Assets/WideS.ico"
         Width="540"
         Height="304"
-        MinWidth="380"
-        MinHeight="214"
+        MinWidth="360"
+        MinHeight="200"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
         ResizeMode="CanResize"
         ShowInTaskbar="True"
         Topmost="True"
-        Background="{StaticResource AppBgBrush}">
-    <Border Background="#FF000000"
-            BorderBrush="{DynamicResource BorderMainBrush}"
-            BorderThickness="1"
-            CornerRadius="5"
-            ClipToBounds="True">
-        <Grid>
-            <ContentControl x:Name="PlayerHost" />
-            <Border Height="7"
-                    VerticalAlignment="Top"
-                    Background="Transparent"
-                    Cursor="SizeAll"
-                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
-                    ToolTip="Перетащите для перемещения" />
-        </Grid>
-    </Border>
+        Background="#FF000000">
+    <ContentControl x:Name="PlayerHost" />
 </Window>

@@ -1,12 +1,12 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Input;
 
 namespace DevCockpit;
 
 public partial class FloatingVideoWindow : Window
 {
     private bool _allowClose;
+    private VideoBrowserView? _view;
 
     public event EventHandler? CloseRequested;
 
@@ -15,9 +15,28 @@ public partial class FloatingVideoWindow : Window
         InitializeComponent();
     }
 
-    public void Attach(VideoBrowserView view) => view.AttachTo(PlayerHost);
+    public void Attach(VideoBrowserView view)
+    {
+        if (_view is not null)
+        {
+            _view.DragRequested -= HandleDragRequested;
+        }
 
-    public void Detach() => PlayerHost.Content = null;
+        _view = view;
+        _view.DragRequested += HandleDragRequested;
+        view.AttachTo(PlayerHost);
+    }
+
+    public void Detach()
+    {
+        if (_view is not null)
+        {
+            _view.DragRequested -= HandleDragRequested;
+            _view = null;
+        }
+
+        PlayerHost.Content = null;
+    }
 
     public void EnterFullScreen()
     {
@@ -34,6 +53,7 @@ public partial class FloatingVideoWindow : Window
 
     public void ClosePermanently()
     {
+        Detach();
         _allowClose = true;
         Close();
     }
@@ -50,6 +70,15 @@ public partial class FloatingVideoWindow : Window
         base.OnClosing(e);
     }
 
-    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
-        EditorWindowHelper.TitleBar_MouseLeftButtonDown(this, e);
+    private void HandleDragRequested()
+    {
+        try
+        {
+            DragMove();
+        }
+        catch
+        {
+            // DragMove может упасть, если кнопку уже отпустили.
+        }
+    }
 }
