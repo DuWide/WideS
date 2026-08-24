@@ -1,13 +1,11 @@
 ﻿using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
@@ -27,7 +25,6 @@ public partial class MainWindow : Window
     private const int HotkeyDock = 1003;
     private const int HotkeySearch = 1004;
     private const int WmHotkey = 0x0312;
-    private const int WmClipboardUpdate = 0x031D;
     private const int WmGetMinMaxInfo = 0x0024;
     private const uint MonitorDefaultToNearest = 0x00000002;
     private const uint ModAlt = 0x0001;
@@ -41,7 +38,6 @@ public partial class MainWindow : Window
     private readonly JsonFileStore<NotesStoreData> _notesStore = new(AppPaths.NotesJson);
     private readonly JsonFileStore<ConnectionsStoreData> _connectionsStore = new(AppPaths.ConnectionsJson);
     private readonly JsonFileStore<AppSettingsData> _settingsStore = new(AppPaths.SettingsJson);
-    private readonly JsonFileStore<CommandRecipesStoreData> _commandRecipesStore = new(AppPaths.CommandRecipesJson);
     private readonly JsonFileStore<AiAgentsStoreData> _aiAgentsStore = new(AppPaths.AiAgentsJson);
     private readonly JsonFileStore<TasksStoreData> _tasksStore = new(AppPaths.TasksJson);
     private readonly JsonFileStore<ActivityStoreData> _activityStore = new(AppPaths.ActivityJson);
@@ -51,7 +47,6 @@ public partial class MainWindow : Window
     private NotesStoreData _notes = new();
     private ConnectionsStoreData _connections = new();
     private AppSettingsData _settings = new();
-    private CommandRecipesStoreData _commandRecipes = new();
     private AiAgentsStoreData _aiAgents = new();
     private TasksStoreData _tasks = new();
     private ActivityStoreData _activity = new();
@@ -81,7 +76,6 @@ public partial class MainWindow : Window
     private readonly MediaService _mediaService = new();
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _telegramTimer = new() { Interval = TimeSpan.FromSeconds(45) };
-    private readonly DispatcherTimer _clipboardCaptureTimer = new() { Interval = TimeSpan.FromMilliseconds(450) };
     private readonly TelegramTaskService _telegramTaskService = new();
     private DateTime _lastTelegramDesktopWriteUtc = DateTime.MinValue;
     private TaskReminderWindow? _activeReminderWindow;
@@ -92,8 +86,6 @@ public partial class MainWindow : Window
     private HwndSource? _hwndSource;
     private FloatingDockWindow? _dockWindow;
     private GlobalSearchWindow? _globalSearchWindow;
-    private string? _lastClipboardImageHash;
-    private DateTime _lastScreenshotPromptAt = DateTime.MinValue;
 
     public MainWindow()
     {
@@ -103,15 +95,9 @@ public partial class MainWindow : Window
         LoadData();
         AfterLoadData();
         BuildNavGrouped();
-        InitializeVideoLifecycle();
         SetupTrayIcon();
         _taskTimer.Tick += (_, _) => CheckTaskReminders();
         _taskTimer.Start();
-        _clipboardCaptureTimer.Tick += (_, _) =>
-        {
-            _clipboardCaptureTimer.Stop();
-            HandleClipboardUpdate();
-        };
         _pillTimer.Tick += (_, _) => UpdateActiveTaskPill();
         Loaded += (_, _) =>
         {
@@ -124,7 +110,6 @@ public partial class MainWindow : Window
         InitializeNowPlaying();
         InitializeTelegramPolling();
         InitializePortal();
-        InitializePulse();
         AddLog("OK", "WideS запущен.");
     }
 
@@ -331,8 +316,6 @@ public partial class MainWindow : Window
                 StartAt = startAt,
                 EndAt = endAt,
                 ReminderAt = null,
-                ContactName = parsed.ContactName,
-                ContactPhone = parsed.ContactPhone,
                 TelegramKey = incoming.TelegramKey,
                 TelegramExternalId = parsed.ExternalId,
                 CreatedAt = DateTime.Now
@@ -370,13 +353,10 @@ public partial class MainWindow : Window
         _notes = _notesStore.Load();
         _connections = _connectionsStore.Load();
         _settings = _settingsStore.Load();
-        _commandRecipes = _commandRecipesStore.Load();
         _aiAgents = _aiAgentsStore.Load();
         _tasks = _tasksStore.Load();
         _activity = _activityStore.Load();
         _templates = _templatesStore.Load();
-        _clipboardHistory = _clipboardStore.Load();
-        EnsureCommandRecipeDefaults();
         EnsureAiAgentDefaults();
         EnsureProjectTemplateDefaults();
         MigrateCreatedAtDefaults();
@@ -418,11 +398,6 @@ public partial class MainWindow : Window
             item.CreatedAt = DateTime.Now;
             migrated = true;
         }
-        foreach (var item in _commandRecipes.Recipes.Where(r => r.CreatedAt.Year < 2000))
-        {
-            item.CreatedAt = DateTime.Now;
-            migrated = true;
-        }
         if (migrated)
         {
             _projectStore.Save(_projects);
@@ -430,7 +405,6 @@ public partial class MainWindow : Window
             _connectionsStore.Save(_connections);
             _tasksStore.Save(_tasks);
             _aiAgentsStore.Save(_aiAgents);
-            _commandRecipesStore.Save(_commandRecipes);
         }
     }
 
@@ -441,15 +415,9 @@ public partial class MainWindow : Window
         "tasks" => "nav-tasks",
         "notes" => "nav-notes",
         "connections" => "nav-connections",
-        "contacts" => "nav-contacts",
         "ai" => "nav-browser",
-        "commands" => "nav-commands",
-        "backup" => "nav-backup",
         "dropzone" => "nav-dropzone",
         "settings" => "nav-settings",
-        "clipboard" => "nav-clipboard",
-        "pulse" => "nav-pulse",
-        "video" => "nav-video",
         "favorites" => "star",
         _ => "nav-home"
     };
@@ -512,14 +480,8 @@ public partial class MainWindow : Window
         {
             "home"        => "home",
             "projects"    => "projects",
-            "contacts"    => "contacts",
             "ai"          => "ai",
-            "commands"    => "commands",
-            "backup"      => "backup",
             "settings"    => "settings",
-            "clipboard"   => "clipboard",
-            "pulse"       => "pulse",
-            "video"       => "video",
             _ => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase) ? "projects" : null
         };
         var topKey = key is "notes" or "connections" or "tasks" or "dropzone" or "favorites" ? key : null;
@@ -581,10 +543,6 @@ public partial class MainWindow : Window
         RegisterHotKey(handle, HotkeyNewTask, ModAlt, VkF2);
         RegisterHotKey(handle, HotkeyDock, ModAlt | ModControl, VkSpace);
         RegisterHotKey(handle, HotkeySearch, ModControl, VkK);
-        if (_settings.ClipboardScreenshotPrompt || _settings.ClipboardHistoryEnabled)
-        {
-            AddClipboardFormatListener(handle);
-        }
     }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -606,12 +564,8 @@ public partial class MainWindow : Window
         UnregisterHotKey(handle, HotkeyNewTask);
         UnregisterHotKey(handle, HotkeyDock);
         UnregisterHotKey(handle, HotkeySearch);
-        RemoveClipboardFormatListener(handle);
         _hwndSource?.RemoveHook(WndProc);
         _dockWindow?.Close();
-        ShutdownVideoBrowser();
-        _pulseTimer.Stop();
-        _clipboardCaptureTimer.Stop();
         _trayIcon?.Dispose();
         ShutdownPortalService();
         base.OnClosing(e);
@@ -646,11 +600,6 @@ public partial class MainWindow : Window
                 handled = true;
             }
         }
-        else if (msg == WmClipboardUpdate)
-        {
-            _clipboardCaptureTimer.Stop();
-            _clipboardCaptureTimer.Start();
-        }
         else if (msg == WmGetMinMaxInfo)
         {
             ApplyMaximizeWorkArea(hwnd, lParam);
@@ -682,91 +631,6 @@ public partial class MainWindow : Window
         mmi.ptMaxSize.X = Math.Abs(work.Right - work.Left);
         mmi.ptMaxSize.Y = Math.Abs(work.Bottom - work.Top);
         Marshal.StructureToPtr(mmi, lParam, true);
-    }
-
-    private void UpdateClipboardScreenshotListener()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle == IntPtr.Zero) return;
-
-        RemoveClipboardFormatListener(handle);
-        if (_settings.ClipboardScreenshotPrompt || _settings.ClipboardHistoryEnabled)
-        {
-            AddClipboardFormatListener(handle);
-        }
-    }
-
-    private void HandleClipboardUpdate()
-    {
-        CaptureCurrentClipboard();
-        if (!_settings.ClipboardScreenshotPrompt) return;
-        if (DateTime.Now - _lastScreenshotPromptAt < TimeSpan.FromMilliseconds(700)) return;
-        if (!ClipboardHasBitmapWithoutText()) return;
-
-        BitmapSource? image;
-        try
-        {
-            if (!WpfClipboard.ContainsImage()) return;
-            image = WpfClipboard.GetImage();
-        }
-        catch
-        {
-            return;
-        }
-
-        if (image is null) return;
-        var hash = HashBitmap(image);
-        if (!string.IsNullOrWhiteSpace(hash) && hash == _lastClipboardImageHash) return;
-        _lastClipboardImageHash = hash;
-        _lastScreenshotPromptAt = DateTime.Now;
-
-        var project = _focusProject ?? _selectedProject ?? _projects.Projects.FirstOrDefault();
-        if (project is null) return;
-
-        ShowFromTray();
-        var result = WpfMessageBox.Show(this,
-            $"Сохранить скриншот в папку дня проекта \"{project.Name}\"?",
-            "WideS",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes) return;
-
-        try
-        {
-            var screenshots = Path.Combine(AppPaths.EnsureTodayWorkDay(project), "Screenshots");
-            Directory.CreateDirectory(screenshots);
-            var path = Path.Combine(screenshots, $"screenshot-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.png");
-            SaveBitmap(image, path);
-            AddLog("OK", $"Скриншот сохранен: {path}");
-        }
-        catch (Exception ex)
-        {
-            AddLog("ERR", $"Скриншот: {ex.Message}");
-        }
-    }
-
-    private static string HashBitmap(BitmapSource image)
-    {
-        try
-        {
-            using var stream = new MemoryStream();
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(image));
-            encoder.Save(stream);
-            return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream.ToArray()));
-        }
-        catch
-        {
-            return "";
-        }
-    }
-
-    private static void SaveBitmap(BitmapSource image, string path)
-    {
-        using var stream = File.Create(path);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(image));
-        encoder.Save(stream);
     }
 
     private void SetupTrayIcon()
@@ -810,7 +674,6 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
-        FloatVideoIfAvailable();
         Hide();
     }
 
@@ -874,11 +737,6 @@ public partial class MainWindow : Window
             _forwardStack.Clear();
         }
 
-        if (_currentViewKey == "video" && key != "video")
-        {
-            FloatVideoIfAvailable();
-        }
-
         _currentViewKey = key;
         if (IsTabView(key) && !_openTabs.Contains(key))
         {
@@ -926,16 +784,10 @@ public partial class MainWindow : Window
                 case "projects": ShowProjects(); break;
                 case "favorites": ShowFavorites(); break;
                 case "tasks": ShowTasks(); break;
-                case "contacts": ShowContacts(); break;
-                case "commands": ShowCommandRecipes(); break;
                 case "ai": ShowAiAgents(); break;
                 case "history": ShowHistory(); break;
                 case "dropzone": ShowDropZone(); break;
-                case "backup": ShowBackupContext(); break;
                 case "settings": ShowSettings(); break;
-                case "clipboard": ShowClipboardHistory(); break;
-                case "pulse": ShowPulse(); break;
-                case "video": ShowVideo(); break;
                 default: ShowHome(); break;
             }
         }
@@ -1024,12 +876,9 @@ public partial class MainWindow : Window
             "projects" => "Проекты",
             "favorites" => "Избранное",
             "tasks" => "Задачи",
-            "contacts" => "Клиенты",
-            "commands" => "Команды",
             "ai" => "Браузер",
             "history" => "История",
             "dropzone" => "DropZone",
-            "backup" => "Backup",
             "settings" => "Настройки",
             _ => key
         };
@@ -1084,7 +933,7 @@ public partial class MainWindow : Window
             Name = "Стандартный проект WideS",
             Folders = ["Docs", "Source", "Tests", "Releases", "_Inbox"],
             NoteTitles = ["README проекта", "Контекст проекта", "Решения и договоренности"],
-            TaskTitles = ["Проверить структуру проекта", "Собрать первый backup", "Подготовить context.txt"]
+            TaskTitles = ["Проверить структуру проекта", "Подготовить context.txt"]
         });
         _templatesStore.Save(_templates);
     }
@@ -1093,18 +942,6 @@ public partial class MainWindow : Window
 
 
 
-
-    private static IEnumerable<string> ExtractVariables(string command)
-    {
-        return Regex.Matches(command, "\\{([a-zA-Z0-9_а-яА-ЯёЁ-]+)\\}")
-            .Select(m => m.Groups[1].Value)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string QuotePowerShell(string command)
-    {
-        return "\"" + command.Replace("\"", "\\\"") + "\"";
-    }
 
 
 
@@ -1224,23 +1061,6 @@ public partial class MainWindow : Window
 
 
 
-    private async void BackupSelected()
-    {
-        var project = RequireProject();
-        if (project is null) return;
-        try
-        {
-            var result = await BackupService.CreateBackupAsync(project);
-            WpfClipboard.SetText(result.ZipPath);
-            AddLog("OK", $"Backup создан: {result.ZipPath} (+{result.NewFilesSincePrevious} новых файлов)");
-        }
-        catch (Exception ex)
-        {
-            AddLog("ERR", $"Backup: {ex.Message}");
-        }
-    }
-
-
     private void ShowGlobalSearch()
     {
         if (_globalSearchWindow is { IsVisible: true })
@@ -1305,22 +1125,6 @@ public partial class MainWindow : Window
                 new GlobalSearchWindow.SearchHit("Ссылка", link.Name, link.Url, () => OpenUrl(link.Url, link.Name))));
         }
 
-        foreach (var recipe in _commandRecipes.Recipes.Where(x =>
-                     x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                     x.Command.Contains(query, StringComparison.OrdinalIgnoreCase)))
-        {
-            hits.Add((recipe.CreatedAt,
-                new GlobalSearchWindow.SearchHit("Команда", recipe.Name, recipe.Command, () => RunCommandRecipe(recipe))));
-        }
-
-        foreach (var item in _clipboardHistory.Items.Where(x => !x.IsSensitive &&
-                     (x.Preview.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                      x.Kind.Contains(query, StringComparison.OrdinalIgnoreCase))))
-        {
-            hits.Add((item.CapturedAt,
-                new GlobalSearchWindow.SearchHit("Буфер", item.Kind, item.Preview, () => CopyClipboardItem(item))));
-        }
-
         return hits.OrderByDescending(x => x.SortAt).Select(x => x.Hit).Take(20).ToList();
     }
 
@@ -1335,28 +1139,6 @@ public partial class MainWindow : Window
         if (_selectedProject is not null) return _selectedProject;
         WpfMessageBox.Show(this, "Сначала добавьте проект.", "WideS");
         return null;
-    }
-
-    private string LastBackupsText(ProjectProfile? project)
-    {
-        var backups = new List<string>();
-        var sources = project is null ? _projects.Projects : [project];
-        foreach (var item in sources)
-        {
-            var dir = Path.Combine(AppPaths.TodayWorkDay(item), "Backups");
-            if (!Directory.Exists(dir)) continue;
-            var zips = Directory.GetFiles(dir, "*.zip").OrderByDescending(File.GetLastWriteTime).Take(8).ToList();
-            for (var i = 0; i < zips.Count; i++)
-            {
-                var zip = zips[i];
-                var prevTime = i + 1 < zips.Count ? File.GetLastWriteTime(zips[i + 1]) : DateTime.MinValue;
-                var newFiles = prevTime > DateTime.MinValue
-                    ? BackupService.CountNewFilesSince(item, prevTime)
-                    : -1;
-                backups.Add(BackupService.FormatBackupLine(zip, newFiles));
-            }
-        }
-        return backups.Count == 0 ? "Backup пока не найдены." : string.Join("\n", backups);
     }
 
     private string PromptText(string title, string placeholder)
@@ -2027,24 +1809,6 @@ public partial class MainWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-    private static bool ClipboardHasBitmapWithoutText()
-    {
-        const uint cfUnicodeText = 13;
-        const uint cfBitmap = 2;
-        const uint cfDib = 8;
-        if (IsClipboardFormatAvailable(cfUnicodeText) || IsClipboardFormatAvailable(1)) return false;
-        return IsClipboardFormatAvailable(cfBitmap) || IsClipboardFormatAvailable(cfDib);
-    }
-
-    [DllImport("user32.dll")]
-    private static extern bool IsClipboardFormatAvailable(uint format);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool AddClipboardFormatListener(IntPtr hwnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
     [DllImport("user32.dll")]
     private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);

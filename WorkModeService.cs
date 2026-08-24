@@ -8,8 +8,6 @@ public static class WorkModeService
 
     public static bool ShowMedia(string mode) => !mode.Equals(Focus, StringComparison.OrdinalIgnoreCase);
 
-    public static bool ShowBackupActions(string mode) => mode.Equals(Work, StringComparison.OrdinalIgnoreCase);
-
     public static bool ShowBrowserActions(string mode) => !mode.Equals(Focus, StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<(string Label, string Value)> ModeOptions() =>
@@ -48,8 +46,6 @@ public static class WorkModeService
             ("Заметка", "note"),
             ("Задача", "task"),
             ("Подключение", "connection"),
-            ("Команда", "command"),
-            ("Backup", "backup"),
             ("Скопировать в AI", "context"),
             ("Отчёт", "report"),
             ("DropZone", "dropzone")

@@ -23,7 +23,6 @@
     </Content>
     <Compile Remove="legacy\**" />
     <Compile Remove="for-claude\**" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
     <Page Remove="for-claude\**" />
     <ApplicationDefinition Remove="for-claude\**" />
     <Resource Include="Assets\WideS.ico" />

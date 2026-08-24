@@ -104,77 +104,10 @@ public partial class MainWindow
         card.Child = stack;
         panel.Children.Add(card);
 
-        var yummyCard = Card("YummyAnime");
-        yummyCard.Width = 720;
-        var yummyStack = BaseCardStack("YummyAnime");
-        yummyStack.Children.Add(Muted("Публичный X-Application token приложения. Приватный токен сюда не вводите."));
-        var yummyToken = new PasswordBox
-        {
-            Margin = new Thickness(0, 8, 0, 8),
-            MinWidth = 520,
-            Padding = new Thickness(10),
-            Background = (WpfBrush)FindResource("PanelBrush"),
-            Foreground = (WpfBrush)FindResource("TextBrush")
-        };
-        if (!string.IsNullOrWhiteSpace(SecretService.Unprotect(_settings.YummyAnimeAppTokenEncrypted)))
-        {
-            yummyToken.Password = "********";
-        }
-        yummyStack.Children.Add(yummyToken);
-        yummyStack.Children.Add(Muted("Логин пользователя выполняется в разделе «Плеер». Пароль не сохраняется; токен аккаунта защищён DPAPI."));
-        var yummyButtons = new WrapPanel();
-        yummyButtons.Children.Add(ActionButton("Сохранить токен", () =>
-        {
-            if (!string.IsNullOrWhiteSpace(yummyToken.Password) && yummyToken.Password != "********")
-            {
-                _settings.YummyAnimeAppTokenEncrypted = SecretService.Protect(yummyToken.Password.Trim());
-                _settings.YummyAnimeUserTokenEncrypted = "";
-            }
-            _settingsStore.Save(_settings);
-            ResetVideoBrowser();
-            AddLog("OK", "Токен YummyAnime сохранён.");
-        }, false));
-        yummyButtons.Children.Add(ActionButton("Открыть приложения YummyAnime", () =>
-        {
-            Process.Start(new ProcessStartInfo("https://yummyani.me/dev/applications")
-            {
-                UseShellExecute = true
-            });
-        }, false));
-        yummyStack.Children.Add(yummyButtons);
-        yummyCard.Child = yummyStack;
-        panel.Children.Add(yummyCard);
-
         var hotkeys = Card("Горячие клавиши");
         hotkeys.Width = 720;
         var hotkeysStack = BaseCardStack("Горячие клавиши");
         hotkeysStack.Children.Add(Text("Alt+F1 — новая заметка\nAlt+F2 — новая задача\nCtrl+K — поиск\nCtrl+Alt+Space — Floating Dock", 13, (WpfBrush)FindResource("MutedBrush"), new Thickness()));
-        var clipboardScreenshotCheck = new System.Windows.Controls.CheckBox
-        {
-            Content = "Предлагать сохранить скриншот из буфера",
-            IsChecked = _settings.ClipboardScreenshotPrompt,
-            Margin = new Thickness(0, 12, 0, 4),
-            Foreground = (WpfBrush)FindResource("TextBrush")
-        };
-        hotkeysStack.Children.Add(clipboardScreenshotCheck);
-        var clipboardHistoryCheck = new System.Windows.Controls.CheckBox
-        {
-            Content = "Вести локальную историю буфера",
-            IsChecked = _settings.ClipboardHistoryEnabled,
-            Margin = new Thickness(0, 4, 0, 4),
-            Foreground = (WpfBrush)FindResource("TextBrush")
-        };
-        hotkeysStack.Children.Add(clipboardHistoryCheck);
-        hotkeysStack.Children.Add(Muted("Текст хранится через DPAPI; потенциальные пароли скрываются в превью."));
-        hotkeysStack.Children.Add(Muted("Если при RDP не работает копирование/вставка — снимите галочку и сохраните."));
-        hotkeysStack.Children.Add(ActionButton("Сохранить буфер", () =>
-        {
-            _settings.ClipboardScreenshotPrompt = clipboardScreenshotCheck.IsChecked == true;
-            _settings.ClipboardHistoryEnabled = clipboardHistoryCheck.IsChecked == true;
-            _settingsStore.Save(_settings);
-            UpdateClipboardScreenshotListener();
-            AddLog("OK", "Настройка буфера обмена сохранена.");
-        }, false));
         hotkeys.Child = hotkeysStack;
         panel.Children.Add(hotkeys);
 

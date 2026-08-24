@@ -20,7 +20,7 @@
                 <StackPanel>
                     <TextBox x:Name="SearchBox" FontSize="16" MinHeight="36"
                              KeyDown="SearchBox_KeyDown" TextChanged="SearchBox_TextChanged" />
-                    <TextBlock Text="Проекты, задачи, заметки, подключения и буфер"
+                    <TextBlock Text="Проекты, задачи, заметки и подключения"
                                Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

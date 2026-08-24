@@ -18,8 +18,6 @@ public partial class MainWindow
     private bool _updatingProjectSwitcher;
     private Guid? _taskProjectFilter;
     private bool _includeProjectTasks;
-    private string? _contactFilterKey;
-    private string? _contactFilterLabel;
     private string _taskImportanceFilter = "Все";
     private string _noteTagFilter = "";
     private string _projectStatusFilter = "Active";
@@ -100,17 +98,9 @@ public partial class MainWindow
         AddNavGroup("РАБОЧЕЕ ПРОСТРАНСТВО");
         AddNav("Главная", "home", ShowHome);
         AddNav("Проекты", "projects", ShowProjects);
-        AddNav("Клиенты", "contacts", ShowContacts);
 
         AddNavGroup("ЖИВОЕ");
-        AddNav("Буфер", "clipboard", ShowClipboardHistory);
-        AddNav("Пульс", "pulse", ShowPulse);
         AddNav("Браузер", "ai", ShowAiAgents);
-        AddNav("Плеер", "video", ShowVideo);
-
-        AddNavGroup("ИНСТРУМЕНТЫ");
-        AddNav("Команды", "commands", ShowCommandRecipes);
-        AddNav("Backup", "backup", ShowBackupContext);
 
         AddNavGroup("СИСТЕМА");
         AddNav("Настройки", "settings", ShowSettings);
@@ -203,7 +193,6 @@ public partial class MainWindow
             .Where(t => _taskProjectFilter is not null
                 ? t.WorkspaceId == _taskProjectFilter
                 : _includeProjectTasks || !HasTaskProject(t))
-            .Where(t => _contactFilterKey is null || ContactAggregator.MatchesKey(t, _contactFilterKey))
             .Where(t => _taskImportanceFilter == "Все" || t.Importance.Equals(_taskImportanceFilter, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -352,8 +341,6 @@ public partial class MainWindow
             case "note": AddNote(); break;
             case "task": AddTask(); break;
             case "connection": AddConnection(); break;
-            case "command": AddCommandRecipe(); break;
-            case "backup": BackupSelected(); break;
             case "context": CopyForAiSelected(); break;
             case "report": BuildDailyReport(); break;
             case "dropzone": ShowDropZone(); break;
@@ -379,7 +366,7 @@ public partial class MainWindow
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "ZIP archive|*.zip",
-            FileName = $"WideS-backup-{DateTime.Now:yyyyMMdd}.zip"
+            FileName = $"WideS-data-export-{DateTime.Now:yyyyMMdd}.zip"
         };
         if (dialog.ShowDialog() != true) return;
         try

@@ -9,8 +9,6 @@ public sealed class TelegramParsedTask
     public string Title { get; init; } = "";
     public string Description { get; init; } = "";
     public DateTime StartAt { get; init; }
-    public string ContactName { get; init; } = "";
-    public string ContactPhone { get; init; } = "";
 }
 
 public static class TelegramTaskParser
@@ -35,10 +33,6 @@ public static class TelegramTaskParser
         @"^\s*Состояние:\s*(.+?)\s*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
-    private static readonly Regex ContactRegex = new(
-        @"^\s*\*?\s*Контакт:\s*(.+?)(?:\s+тел:\s*([+\d\s()-]+))?\s*\*?\s*$",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline);
-
     public static TelegramParsedTask? TryParse(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
@@ -56,7 +50,6 @@ public static class TelegramTaskParser
 
         var description = DescriptionRegex.Match(text);
         var start = StartRegex.Match(text);
-        var contact = ContactRegex.Match(text);
 
         var startAt = DateTime.Now;
         if (start.Success)
@@ -72,25 +65,13 @@ public static class TelegramTaskParser
         }
 
         var title = customer.Groups[1].Value.Trim().Trim('"');
-        var contactName = contact.Success ? contact.Groups[1].Value.Trim() : "";
-        var phone = contact.Success ? contact.Groups[2].Value.Trim() : "";
-        if (!string.IsNullOrWhiteSpace(contactName))
-        {
-            var phoneIndex = contactName.IndexOf("тел:", StringComparison.OrdinalIgnoreCase);
-            if (phoneIndex >= 0)
-            {
-                contactName = contactName[..phoneIndex].Trim();
-            }
-        }
 
         return new TelegramParsedTask
         {
             ExternalId = $"{header.Groups[1].Value.Trim()} от {header.Groups[2].Value.Trim()}",
             Title = title,
             Description = description.Success ? description.Groups[1].Value.Trim() : "",
-            StartAt = startAt,
-            ContactName = contactName,
-            ContactPhone = phone
+            StartAt = startAt
         };
     }
 }

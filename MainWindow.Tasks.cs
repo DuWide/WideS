@@ -21,10 +21,7 @@ public partial class MainWindow
     {
         EnterView("tasks");
         _viewScope = "tasks";
-        var subtitle = _contactFilterKey is null
-            ? "Личные задачи с датами, важностью и напоминаниями"
-            : $"Фильтр: {_contactFilterLabel}";
-        SetTitle("Задачи", subtitle);
+        SetTitle("Задачи", "Личные задачи с датами, важностью и напоминаниями");
         var root = new DockPanel();
         var toolbar = new StackPanel();
         var row1 = UiHelpers.ToolbarRow();
@@ -116,15 +113,6 @@ public partial class MainWindow
         search = SearchBox("Поиск задач", Render);
         row1.Children.Add(search);
         row1.Children.Add(ActionButton("Новая задача", () => AddTask()));
-        if (_contactFilterKey is not null)
-        {
-            row1.Children.Add(ActionButton("Сбросить контакт", () =>
-            {
-                _contactFilterKey = null;
-                _contactFilterLabel = null;
-                ShowTasks();
-            }, false));
-        }
         row1.Children.Add(ActionButton(_showTaskArchive ? "Активные" : "Архив", () =>
         {
             _showTaskArchive = !_showTaskArchive;
@@ -518,13 +506,6 @@ public partial class MainWindow
         meta.Children.Add(Muted($"{task.StartAt:dd.MM.yyyy HH:mm}"));
         stack.Children.Add(meta);
         stack.Children.Add(Muted(TaskStatusText(task)));
-        if (!string.IsNullOrWhiteSpace(task.ContactName) || !string.IsNullOrWhiteSpace(task.ContactPhone))
-        {
-            var contactLine = string.IsNullOrWhiteSpace(task.ContactPhone)
-                ? task.ContactName
-                : $"{task.ContactName} · {task.ContactPhone}";
-            stack.Children.Add(Muted(contactLine));
-        }
         if (!string.IsNullOrWhiteSpace(task.Description))
         {
         stack.Children.Add(Text(Preview(task.Description, 220), 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 10, 0, 10)));
@@ -559,7 +540,6 @@ public partial class MainWindow
         ("Задача", new GridLength(2, GridUnitType.Star)),
         ("Дата", new GridLength(110)),
         ("Статус", new GridLength(100)),
-        ("Клиент", new GridLength(130)),
         ("Действия", GridLength.Auto));
 
     private Border TaskCompactRow(TaskItem task)
@@ -568,7 +548,6 @@ public partial class MainWindow
             new GridLength(2, GridUnitType.Star),
             new GridLength(110),
             new GridLength(100),
-            new GridLength(130),
             GridLength.Auto);
 
         var titlePanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
@@ -596,13 +575,6 @@ public partial class MainWindow
         var statusText = IsTaskRunning(task) ? "В работе" : IsTaskPaused(task) ? "На паузе" : TaskStatusText(task);
         AddCell(grid, 2, Muted(statusText));
 
-        var contact = string.IsNullOrWhiteSpace(task.ContactName)
-            ? task.ContactPhone
-            : string.IsNullOrWhiteSpace(task.ContactPhone)
-                ? task.ContactName
-                : $"{task.ContactName} · {task.ContactPhone}";
-        AddCell(grid, 3, Muted(string.IsNullOrWhiteSpace(contact) ? "—" : contact));
-
         var actions = CompactRowActions();
         if (task.IsDone)
         {
@@ -626,7 +598,7 @@ public partial class MainWindow
 
         actions.Children.Add(CompactIconButton(EditIconButton(() => EditTask(task))));
         actions.Children.Add(CompactIconButton(FavoriteIconButton(task.IsPinned, () => ToggleTaskPinned(task), 28)));
-        AddCell(grid, 4, actions);
+        AddCell(grid, 3, actions);
 
         return WrapTableRow(grid, () => EditTask(task));
     }

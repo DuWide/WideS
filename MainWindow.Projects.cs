@@ -21,7 +21,7 @@ public partial class MainWindow
     {
         EnterView("projects");
         _viewScope = "projects";
-        SetTitle("Проекты", "Проекты, workspace, TXT-заметки, backup, context и папка дня");
+        SetTitle("Проекты", "Проекты, workspace, TXT-заметки, context и папка дня");
         var root = SectionWithActions(actions =>
         {
             actions.Children.Add(ActionButton("Добавить проект", AddProject));
@@ -258,7 +258,6 @@ public partial class MainWindow
         section.MinHeight = 120;
         var stack = BaseCardStack("Инструменты проекта");
         var actions = new WrapPanel();
-        actions.Children.Add(ActionButton("Backup", BackupSelected, false));
         actions.Children.Add(ActionButton("Скопировать в AI", CopyForAiSelected, false));
         actions.Children.Add(ActionButton("Отчет дня", BuildDailyReport, false));
         actions.Children.Add(ActionButton("Шаблон", () => ApplyProjectTemplate(project), false));
@@ -532,7 +531,6 @@ public partial class MainWindow
         if (!project.Status.Equals("Paused", StringComparison.OrdinalIgnoreCase)) AddItem("Поставить на паузу", () => SetProjectStatus(project, "Paused"));
         if (!project.Status.Equals("Archive", StringComparison.OrdinalIgnoreCase)) AddItem("Переместить в архив", () => SetProjectStatus(project, "Archive"));
         menu.Items.Add(new Separator());
-        AddItem("Создать Backup", () => { _selectedProject = project; BackupSelected(); });
         AddItem("Скопировать в AI", () => { _selectedProject = project; CopyForAiSelected(); });
         AddItem("Открыть папку дня", () => { _selectedProject = project; OpenWorkday(); });
         AddItem("Применить шаблон", () => ApplyProjectTemplate(project));
@@ -744,7 +742,6 @@ public partial class MainWindow
         card.Width = 760;
         var stack = BaseCardStack("Инструменты проекта");
         var actions = new WrapPanel();
-        actions.Children.Add(ActionButton("Backup", BackupSelected, false));
         actions.Children.Add(ActionButton("Скопировать в AI", CopyForAiSelected, false));
         actions.Children.Add(ActionButton("Отчет дня", BuildDailyReport, false));
         actions.Children.Add(ActionButton("Шаблон", () => ApplyProjectTemplate(project), false));

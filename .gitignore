@@ -17,8 +17,14 @@ setup/output/
 # Local backups (not part of the app)
 _DevCockpitBackups/
 
-# Sanitized AI snapshot — duplicate of root sources
-for-claude/src/
+# Local / AI helper dirs (not part of the app)
+for-claude/
+_WorkDay/
+.agents/
+.codex/
+
+# Bundled setup zip is generated, not source
+setup/WideS-Setup.zip
 
 # OS
 Thumbs.db

@@ -44,12 +44,6 @@
                     <TextBox x:Name="DescriptionBox" AcceptsReturn="True" TextWrapping="Wrap"
                              VerticalScrollBarVisibility="Auto" MinHeight="120" Margin="0,0,0,14" />
 
-                    <TextBlock Text="Контакт" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                    <TextBox x:Name="ContactNameBox" Margin="0,0,0,14" />
-
-                    <TextBlock Text="Телефон" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
-                    <TextBox x:Name="ContactPhoneBox" Margin="0,0,0,14" />
-
                     <TextBlock Text="Дата и время" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,6" />
                     <Grid Margin="0,0,0,14">
                         <Grid.ColumnDefinitions>

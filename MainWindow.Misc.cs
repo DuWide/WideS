@@ -46,96 +46,6 @@ public partial class MainWindow
         card.Child = stack;
         ContentHost.Content = card;
     }
-    private void ShowBackupContext()
-    {
-        EnterView("backup");
-        SetTitle("Backup", "Защитить проект и подготовить материалы для AI");
-        var panel = new WrapPanel();
-        var selected = _selectedProject ?? _projects.Projects.FirstOrDefault();
-        panel.Children.Add(CardText("Выбранный проект", selected is null ? "Проект не выбран." : $"{selected.Name}\n{selected.ProjectFolder}"));
-
-        var progressBar = new System.Windows.Controls.ProgressBar
-        {
-            Width = 680,
-            Height = 8,
-            Margin = new Thickness(8, 4, 8, 4),
-            Visibility = Visibility.Collapsed
-        };
-        var progressLabel = Muted("Готов к backup");
-        WpfButton? backupBtn = null;
-        WpfButton? contextBtn = null;
-        WpfButton? openBtn = null;
-
-        void SetBusy(bool busy, string label)
-        {
-            if (backupBtn is not null) backupBtn.IsEnabled = !busy;
-            if (contextBtn is not null) contextBtn.IsEnabled = !busy;
-            if (openBtn is not null) openBtn.IsEnabled = !busy;
-            progressBar.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-            progressLabel.Text = label;
-        }
-
-        var actions = Card("Действия");
-        var wrap = new WrapPanel();
-        backupBtn = ActionButton("Backup", () => _ = RunBackupAsync());
-        contextBtn = ActionButton("Скопировать в AI", () => RunCopyForAiWithBusy(), false);
-        openBtn = ActionButton("Открыть Backups", OpenBackups, false);
-        wrap.Children.Add(backupBtn);
-        wrap.Children.Add(contextBtn);
-        wrap.Children.Add(openBtn);
-        actions.Child = WithTitle("Действия", wrap);
-        panel.Children.Add(actions);
-        panel.Children.Add(progressBar);
-        panel.Children.Add(progressLabel);
-        panel.Children.Add(CardText("Последние backup", LastBackupsText(selected)));
-        ContentHost.Content = panel;
-
-        async Task RunBackupAsync()
-        {
-            var project = RequireProject();
-            if (project is null) return;
-            SetBusy(true, "Подготовка backup...");
-            try
-            {
-                var progress = new Progress<BackupService.BackupProgress>(p =>
-                {
-                    progressBar.Maximum = Math.Max(1, p.Total);
-                    progressBar.Value = p.Current;
-                    progressLabel.Text = $"Архивация {p.Current}/{p.Total}: {Path.GetFileName(p.FileName)}";
-                });
-                var result = await BackupService.CreateBackupAsync(project, progress);
-                WpfClipboard.SetText(result.ZipPath);
-                AddLog("OK", $"Backup создан: {result.ZipPath} (+{result.NewFilesSincePrevious} новых файлов)");
-                ShowBackupContext();
-            }
-            catch (Exception ex)
-            {
-                AddLog("ERR", $"Backup: {ex.Message}");
-                SetBusy(false, "Ошибка backup");
-            }
-        }
-
-        void RunCopyForAiWithBusy()
-        {
-            var project = RequireProject();
-            if (project is null) return;
-            SetBusy(true, "Подготовка текста для AI...");
-            try
-            {
-                var window = new CopyForAiWindow(project, _notes.Notes) { Owner = this };
-                if (window.ShowDialog() == true)
-                {
-                    AddLog("OK", window.SavedPath is null
-                        ? "Текст для AI скопирован в буфер."
-                        : $"Текст для AI скопирован. Файл: {window.SavedPath}");
-                }
-            }
-            finally
-            {
-                SetBusy(false, "Готов к backup");
-            }
-        }
-    }
     private void CopyForAiSelected()
     {
         var project = RequireProject();
@@ -147,12 +57,6 @@ public partial class MainWindow
                 ? "Текст для AI скопирован в буфер."
                 : $"Текст для AI скопирован. Файл: {window.SavedPath}");
         }
-    }
-    private void OpenBackups()
-    {
-        var project = RequireProject();
-        if (project is null) return;
-        ShellHelper.OpenPath(Path.Combine(AppPaths.EnsureTodayWorkDay(project), "Backups"));
     }
     private void DropZone_Drop(object sender, System.Windows.DragEventArgs e)
     {

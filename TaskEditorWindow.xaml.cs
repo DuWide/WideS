@@ -33,8 +33,6 @@ public partial class TaskEditorWindow : Window
                 ReminderAt = source.ReminderAt,
                 LastNotifiedAt = source.LastNotifiedAt,
                 Recurrence = source.Recurrence,
-                ContactName = source.ContactName,
-                ContactPhone = source.ContactPhone,
                 TelegramKey = source.TelegramKey,
                 TelegramExternalId = source.TelegramExternalId,
                 CreatedAt = source.CreatedAt,
@@ -52,8 +50,6 @@ public partial class TaskEditorWindow : Window
 
         TitleBox.Text = Task.Title;
         DescriptionBox.Text = Task.Description;
-        ContactNameBox.Text = Task.ContactName;
-        ContactPhoneBox.Text = Task.ContactPhone;
         InitDateTimeControls(Task.StartAt, StartDatePicker, StartHourBox, StartMinuteBox);
 
         SelectImportance(Task.Importance);
@@ -64,8 +60,6 @@ public partial class TaskEditorWindow : Window
     {
         if (!string.Equals(TitleBox.Text.Trim(), Task.Title, StringComparison.Ordinal)) return true;
         if (!string.Equals(DescriptionBox.Text.Trim(), Task.Description, StringComparison.Ordinal)) return true;
-        if (!string.Equals(ContactNameBox.Text.Trim(), Task.ContactName, StringComparison.Ordinal)) return true;
-        if (!string.Equals(ContactPhoneBox.Text.Trim(), Task.ContactPhone, StringComparison.Ordinal)) return true;
         if (_importance != Task.Importance) return true;
         if ((RecurrenceBox.SelectedItem?.ToString() ?? "None") != (string.IsNullOrWhiteSpace(Task.Recurrence) ? "None" : Task.Recurrence)) return true;
         var projectId = ProjectBox.SelectedItem is ProjectProfile project ? project.Id : (Guid?)null;
@@ -95,8 +89,6 @@ public partial class TaskEditorWindow : Window
 
         Task.Title = TitleBox.Text.Trim();
         Task.Description = DescriptionBox.Text.Trim();
-        Task.ContactName = ContactNameBox.Text.Trim();
-        Task.ContactPhone = ContactPhoneBox.Text.Trim();
         Task.StartAt = startAt;
         Task.EndAt = startAt.AddHours(1);
         Task.Importance = _importance;

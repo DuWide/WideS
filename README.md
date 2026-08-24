@@ -1,11 +1,6 @@
 # WideS (DevCockpit)
 
-Personal developer cockpit: проекты, задачи, заметки, подключения, команды, DropZone.
-
-Пассивные разделы:
-
-- **Буфер** — локальная DPAPI-история текста, ссылок, путей, команд и изображений с автоматической классификацией.
-- **Пульс** — живые показатели компьютера, сети, диска, экранов и запущенных рабочих приложений.
+Personal developer cockpit: проекты, задачи, заметки, подключения, DropZone.
 
 Визуальная система v1.5:
 
@@ -36,8 +31,7 @@ DevCockpit/
 ├── tools/                # утилиты → см. tools/README.md
 ├── legacy/               # старый код, не в сборке → см. legacy/README.md
 ├── publish/              # локальный exe (gitignore)
-├── bin/, obj/            # сборка (gitignore)
-└── _DevCockpitBackups/   # локальные бэкапы (gitignore)
+└── bin/, obj/            # сборка (gitignore)
 ```
 
 ## Сборка

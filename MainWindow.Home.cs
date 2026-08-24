@@ -43,8 +43,6 @@ public partial class MainWindow
         grid.Children.Add(HomeMiniCard("Подключения", $"{_connections.Connections.Count} записей", ShowConnections));
         grid.Children.Add(HomeMiniCard("Заметки", $"{openNotes} заметок", ShowNotes));
         grid.Children.Add(HomeMiniCard("Проекты", $"{activeProjects.Count} активных", ShowProjects));
-        grid.Children.Add(HomeMiniCard("Буфер", $"{_clipboardHistory.Items.Count} элементов", ShowClipboardHistory));
-        grid.Children.Add(HomeMiniCard("Пульс", $"CPU {_pulseSnapshot.CpuPercent:0}% · RAM {_pulseSnapshot.MemoryPercent:0}%", ShowPulse));
         right.Children.Add(grid);
         Grid.SetColumn(right, 1);
         root.Children.Add(right);
@@ -101,7 +99,7 @@ public partial class MainWindow
         var wrap = new WrapPanel();
         foreach (var action in WorkModeService.HomeQuickActions(_settings.WorkMode))
         {
-            wrap.Children.Add(ActionButton(action.Label, () => RunHomeQuickAction(action.Key), action.Key is "note" or "task" or "backup"));
+            wrap.Children.Add(ActionButton(action.Label, () => RunHomeQuickAction(action.Key), action.Key is "note" or "task"));
         }
         card.Child = WithTitle($"Быстрые действия · {WorkModeService.DisplayName(_settings.WorkMode)}", wrap);
         return card;

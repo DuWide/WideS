@@ -91,90 +91,11 @@ public sealed class AppSettingsData
     public bool ToastNotificationsEnabled { get; set; } = true;
     public bool PortalEnabled { get; set; }
     public int PortalPort { get; set; } = 7788;
-    public bool ClipboardScreenshotPrompt { get; set; } = true;
-    public bool ClipboardHistoryEnabled { get; set; } = true;
-    public string YummyAnimeAppTokenEncrypted { get; set; } = "";
-    public string YummyAnimeUserTokenEncrypted { get; set; } = "";
-    public List<YummyAnimeFavorite> YummyAnimeFavorites { get; set; } = [];
-    public List<YummyAnimeWatchEntry> YummyAnimeWatchHistory { get; set; } = [];
-    public bool VideoBlockAds { get; set; }
-    public bool VideoSkipOpening { get; set; } = true;
-    public bool VideoAutoNextEpisode { get; set; } = true;
-    public int VideoSkipOpeningSeconds { get; set; } = 90;
-}
-
-public sealed class YummyAnimeFavorite
-{
-    public int AnimeId { get; set; }
-    public string Title { get; set; } = "";
-    public string Subtitle { get; set; } = "";
-    public string PosterUrl { get; set; } = "";
-}
-
-public sealed class YummyAnimeWatchEntry
-{
-    public int VideoId { get; set; }
-    public int AnimeId { get; set; }
-    public string AnimeTitle { get; set; } = "";
-    public string Episode { get; set; } = "";
-    public string Dubbing { get; set; } = "";
-    public string Player { get; set; } = "";
-    public string PosterUrl { get; set; } = "";
-    public int ProgressSeconds { get; set; }
-    public int DurationSeconds { get; set; }
-    public DateTime WatchedAt { get; set; } = DateTime.Now;
-
-    public string Title => AnimeTitle;
-    public string Subtitle
-    {
-        get
-        {
-            var progress = DurationSeconds > 0
-                ? $"{ProgressSeconds / 60}:{ProgressSeconds % 60:D2} / {DurationSeconds / 60}:{DurationSeconds % 60:D2}"
-                : Episode;
-            return string.IsNullOrWhiteSpace(Episode)
-                ? $"{progress} · {WatchedAt:dd.MM HH:mm}"
-                : $"{Episode} · {progress} · {WatchedAt:dd.MM HH:mm}";
-        }
-    }
 }
 
 public sealed record SelectOption(string Label, string Value)
 {
     public override string ToString() => Label;
-}
-
-public sealed class ClipboardHistoryItem
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Kind { get; set; } = "Текст";
-    public string Preview { get; set; } = "";
-    public string EncryptedContent { get; set; } = "";
-    public string ImagePath { get; set; } = "";
-    public string SourceApp { get; set; } = "";
-    public string ContentHash { get; set; } = "";
-    public bool IsSensitive { get; set; }
-    public bool IsPinned { get; set; }
-    public DateTime CapturedAt { get; set; } = DateTime.Now;
-}
-
-public sealed class ClipboardHistoryStoreData
-{
-    public List<ClipboardHistoryItem> Items { get; set; } = [];
-}
-
-public sealed class CommandRecipeItem
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Name { get; set; } = "";
-    public string Command { get; set; } = "";
-    public bool UseShell { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-}
-
-public sealed class CommandRecipesStoreData
-{
-    public List<CommandRecipeItem> Recipes { get; set; } = [];
 }
 
 public sealed class AiAgentItem
@@ -210,8 +131,6 @@ public sealed class TaskItem
     public DateTime? LastNotifiedAt { get; set; }
     public string Recurrence { get; set; } = "None";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
-    public string ContactName { get; set; } = "";
-    public string ContactPhone { get; set; } = "";
     public string TelegramKey { get; set; } = "";
     public string TelegramExternalId { get; set; } = "";
     public DateTime? WorkStartedAt { get; set; }
