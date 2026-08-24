@@ -13,13 +13,8 @@ namespace DevCockpit;
 public partial class MainWindow
 {
     private int _logSessionCount;
-    private List<string> _lastDropBatch = [];
     private string _breadcrumb = "";
-    private bool _updatingProjectSwitcher;
-    private Guid? _taskProjectFilter;
-    private bool _includeProjectTasks;
-    private string _taskImportanceFilter = "Все";
-    private string _noteTagFilter = "";
+    private string _taskTab = "Все";
     private string _projectStatusFilter = "Active";
     private bool _logExpanded;
     private readonly List<TextBlock> _navGroups = [];
@@ -27,7 +22,6 @@ public partial class MainWindow
 
     private void AfterLoadData()
     {
-        RefreshProjectSwitcher();
         var smokeTheme = Environment.GetEnvironmentVariable("WIDES_THEME");
         ApplyTheme(string.IsNullOrWhiteSpace(smokeTheme) ? _settings.AccentTheme : smokeTheme);
         ApplyCompactSidebar(_settings.CompactSidebar);
@@ -89,27 +83,18 @@ public partial class MainWindow
     private void BuildNavGrouped()
     {
         NavPanel.Children.Clear();
-        TopNavPanel.Children.Clear();
         _sideNavButtons.Clear();
-        _topNavButtons.Clear();
         _navGroups.Clear();
         _navLabels.Clear();
 
         AddNavGroup("РАБОЧЕЕ ПРОСТРАНСТВО");
-        AddNav("Главная", "home", ShowHome);
         AddNav("Проекты", "projects", ShowProjects);
-
-        AddNavGroup("ЖИВОЕ");
-        AddNav("Браузер", "ai", ShowAiAgents);
-
-        AddNavGroup("СИСТЕМА");
+        AddNav("Заметки", "notes", ShowNotes);
+        AddNav("Подключения", "connections", ShowConnections);
+        AddNav("Задачи", "tasks", ShowTasks);
+        AddNav("Мессенджеры", "messengers", ShowMessengers);
+        AddNav("Музыка", "music", ShowMusic);
         AddNav("Настройки", "settings", ShowSettings);
-
-        AddTopNav("Заметки", "notes", ShowNotes);
-        AddTopNav("Подключения", "connections", ShowConnections);
-        AddTopNav("Задачи", "tasks", ShowTasks);
-        AddTopNav("DropZone", "dropzone", ShowDropZone);
-        AddTopNav("Избранное", "favorites", ShowFavorites);
         UpdateNavHighlight();
         ApplyCompactSidebar(_settings.CompactSidebar);
     }
@@ -119,56 +104,17 @@ public partial class MainWindow
         project.Status = status;
         _projectStore.Save(_projects);
         AddLog("OK", $"Статус «{project.Name}»: {UiHelpers.ProjectStatusDisplay(status)}");
-        RefreshProjectSwitcher();
         if (_currentViewKey == "projects") ShowProjects();
-        else RefreshAfterPinnedChange();
+        else RefreshCurrentView();
     }
 
     private void SetTitle(string title, string subtitle, string? breadcrumb = null)
     {
+        UseStandardContentLayout();
         ContentScrollViewer.ScrollToTop();
         PageTitle.Text = title;
         _breadcrumb = breadcrumb ?? title;
         PageSubtitle.Text = string.IsNullOrWhiteSpace(subtitle) ? _breadcrumb : subtitle;
-    }
-
-    private void RefreshProjectSwitcher()
-    {
-        _updatingProjectSwitcher = true;
-        ProjectSwitcher.ItemsSource = null;
-        var items = _projects.Projects
-            .Where(p => !p.Status.Equals("Archive", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(p => p.CreatedAt)
-            .Prepend(new ProjectProfile { Id = Guid.Empty, Name = "(выберите проект)" })
-            .ToList();
-        ProjectSwitcher.ItemsSource = items;
-        ProjectSwitcher.DisplayMemberPath = nameof(ProjectProfile.Name);
-        if (_selectedProject is not null)
-        {
-            ProjectSwitcher.SelectedItem = items.FirstOrDefault(p => p.Id == _selectedProject.Id) ?? items[0];
-        }
-        else
-        {
-            ProjectSwitcher.SelectedIndex = 0;
-        }
-        _updatingProjectSwitcher = false;
-    }
-
-    private void ProjectSwitcher_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updatingProjectSwitcher) return;
-        if (ProjectSwitcher.SelectedItem is not ProjectProfile project || project.Id == Guid.Empty)
-        {
-            _selectedProject = null;
-            PauseRunningTaskIfProjectChanged(null);
-            return;
-        }
-
-        _selectedProject = project;
-        PauseRunningTaskIfProjectChanged(project);
-        project.LastOpenedAt = DateTime.Now;
-        _projectStore.Save(_projects);
-        RenderTabs();
     }
 
     private void UpdateLogPreview()
@@ -186,49 +132,6 @@ public partial class MainWindow
         _dockWindow?.RefreshTheme();
     }
 
-    private IEnumerable<TaskItem> FilteredTasks(bool archive)
-    {
-        return _tasks.Tasks
-            .Where(t => archive ? t.IsDone : !t.IsDone)
-            .Where(t => _taskProjectFilter is not null
-                ? t.WorkspaceId == _taskProjectFilter
-                : _includeProjectTasks || !HasTaskProject(t))
-            .Where(t => _taskImportanceFilter == "Все" || t.Importance.Equals(_taskImportanceFilter, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool HasTaskProject(TaskItem task) =>
-        task.WorkspaceId is { } workspaceId && workspaceId != Guid.Empty;
-
-    private static string TaskGroupKey(TaskItem task, DateTime today)
-    {
-        if (IsTaskRunning(task)) return "В работе";
-        if (IsTaskPaused(task)) return "На паузе";
-        if (task.StartAt.Date < today) return "Просрочено";
-        if (task.StartAt.Date == today) return "Сегодня";
-        if (task.StartAt.Date == today.AddDays(1)) return "Завтра";
-        if (task.StartAt.Year <= 2000) return "Без даты";
-        return "Позже";
-    }
-
-    private Border TaskGroupHeader(string title, bool stretch = false)
-    {
-        return new Border
-        {
-            Width = stretch ? double.NaN : 760,
-            HorizontalAlignment = stretch
-                ? System.Windows.HorizontalAlignment.Stretch
-                : System.Windows.HorizontalAlignment.Left,
-            Margin = new Thickness(8, 14, 8, 6),
-            Child = new TextBlock
-            {
-                Text = title,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = (WpfBrush)FindResource("AccentBrush")
-            }
-        };
-    }
-
     private void CompleteTaskWithRecurrence(TaskItem task)
     {
         if (!task.Recurrence.Equals("None", StringComparison.OrdinalIgnoreCase))
@@ -241,7 +144,6 @@ public partial class MainWindow
                 Title = task.Title,
                 Description = task.Description,
                 Importance = task.Importance,
-                WorkspaceId = task.WorkspaceId,
                 StartAt = next,
                 EndAt = next.AddHours(1),
                 ReminderAt = next,
@@ -260,95 +162,6 @@ public partial class MainWindow
         if (project is null) return;
         project.LastOpenedAt = DateTime.Now;
         _projectStore.Save(_projects);
-    }
-
-    private bool EnsureProjectSelected(string action)
-    {
-        if (_selectedProject is not null && _selectedProject.Id != Guid.Empty) return true;
-        WpfMessageBox.Show(this, $"Сначала выберите проект в верхней панели.\n{action}", "WideS");
-        return false;
-    }
-
-    private void UndoLastDrop()
-    {
-        if (_lastDropBatch.Count == 0) return;
-        foreach (var path in _lastDropBatch)
-        {
-            try
-            {
-                if (File.Exists(path)) File.Delete(path);
-            }
-            catch
-            {
-                // ignore
-            }
-        }
-
-        AddLog("OK", $"DropZone: отменено файлов {_lastDropBatch.Count}.");
-        _lastDropBatch.Clear();
-        if (_currentViewKey == "dropzone") ShowDropZone();
-    }
-
-    private string DropTargetPreview()
-    {
-        if (_selectedProject is null) return "Проект не выбран";
-        return AppPaths.GetDropZoneFolder(_selectedProject);
-    }
-
-    private Border FavoriteUnifiedRow(string type, string title, string subtitle, Action open, Action? pinToggle = null)
-    {
-        var row = new Border
-        {
-            Background = (WpfBrush)FindResource("CardBrush"),
-            BorderBrush = (WpfBrush)FindResource("AccentBorderBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
-            Padding = new Thickness(12, 10, 12, 10),
-            Margin = new Thickness(8, 4, 8, 4),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-            Cursor = System.Windows.Input.Cursors.Hand
-        };
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = UiHelpers.TypeBadge(type);
-        Grid.SetColumn(badge, 0);
-        grid.Children.Add(badge);
-        var text = new StackPanel { Margin = new Thickness(8, 0, 8, 0) };
-        text.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Foreground = (WpfBrush)FindResource("TextBrush") });
-        text.Children.Add(new TextBlock { Text = subtitle, FontSize = 12, Foreground = (WpfBrush)FindResource("MutedBrush"), TextTrimming = TextTrimming.CharacterEllipsis });
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(text);
-        if (pinToggle is not null)
-        {
-            var star = FavoriteIconButton(true, pinToggle);
-            Grid.SetColumn(star, 2);
-            grid.Children.Add(star);
-        }
-        row.Child = grid;
-        row.MouseLeftButtonUp += (_, e) =>
-        {
-            if (!IsInsideButton(e.OriginalSource as DependencyObject)) open();
-        };
-        return row;
-    }
-
-    private void RunHomeQuickAction(string key)
-    {
-        switch (key)
-        {
-            case "note": AddNote(); break;
-            case "task": AddTask(); break;
-            case "connection": AddConnection(); break;
-            case "context": CopyForAiSelected(); break;
-            case "report": BuildDailyReport(); break;
-            case "dropzone": ShowDropZone(); break;
-            case "project": ShowProjects(); break;
-            case "cursor": OpenWorkspace(); break;
-            case "browser": ShowAiAgents(); break;
-            case "dock": ToggleDock(); break;
-        }
     }
 
     private async void StartReachabilityIndicator(ConnectionItem item, TextBlock indicator)

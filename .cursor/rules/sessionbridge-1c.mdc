@@ -1,0 +1,39 @@
+---
+description: SessionBridge — Dynamic vs монопольный UpdateDBCfg и цикл правок 1С
+alwaysApply: true
+---
+
+# SessionBridge / правки 1С у клиента
+
+## Динамическое vs монопольное обновление
+
+Платформа разрешает **динамическое** обновление (`UpdateDBCfg -Dynamic+`), только если **не меняется структура данных ИБ**.
+
+### Можно Dynamic+ (по умолчанию)
+
+- код модулей (`.bsl`)
+- правки **Form.xml** (кнопки/группы/команды) — обычно тоже Dynamic+
+- без новых/удалённых реквизитов, ТЧ, измерений, ресурсов
+
+Перед UpdateDBCfg: **остановить отладочный клиент** (`bridge_enterprise` stop). После apply — restart.
+
+### Нужен монопольный (`dynamic=false`)
+
+- новые/удалённые реквизиты, ТЧ, объекты, смена типов
+- fallback, если Dynamic не применил (assert/клиент без маркера)
+
+## Правило для агента
+
+1. По умолчанию `dynamic=true`.
+2. Перед apply — stop enterprise; после — restart (Server → tcp).
+3. `dynamic=false` только для структуры ИБ или если Dynamic не применил.
+4. Расширение авто; выгрузка `C:\Загрузка`; cleanup после работы.
+5. Живой МД — `bridge_live_*` / `bridge_platform_probe` (COM).
+6. UI: тонкий `1cv8c`; Server-ИБ → `/Debug -tcp`.
+
+## Ошибки (синтаксис и т.п.)
+
+1. `bridge_apply` по умолчанию гоняет **CheckModules**.
+2. Если `ok=false` / есть `errors` — исправить и повторить apply.
+3. При ошибках проверки Enterprise **не** стартует.
+4. Отдельно: `bridge_check(mode="modules"|"config"|"both")`.

@@ -56,7 +56,7 @@ public partial class MainWindow
         _viewScope = "project-detail";
         _selectedProject = project;
         TouchProjectOpened(project);
-        SetTitle(project.Name, "Заметки, задачи, подключения и инструменты проекта");
+        SetTitle(project.Name, "Заметки, подключения и инструменты проекта");
         var root = new DockPanel();
 
         var top = new WrapPanel();
@@ -65,8 +65,6 @@ public partial class MainWindow
         top.Children.Add(ActionButton("Cursor", OpenWorkspace, false));
         top.Children.Add(ActionButton("Удалить проект", () => DeleteProject(project), false));
         top.Children.Add(ActionButton("Удалить с диска", () => DeleteProjectFromDisk(project), false));
-        top.Children.Add(ToolbarGap());
-        AddViewModeButtons(top, () => ShowProjectDetail(project));
         var topShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = top };
         DockPanel.SetDock(topShell, Dock.Top);
         root.Children.Add(topShell);
@@ -103,7 +101,6 @@ public partial class MainWindow
             }));
         }
         AddTab("Заметки", "notes");
-        AddTab("Задачи", "tasks");
         AddTab("Подключения", "connections");
         AddTab("Инструменты", "tools");
         DockPanel.SetDock(tabs, Dock.Top);
@@ -112,7 +109,6 @@ public partial class MainWindow
         var contentHost = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         contentHost.Content = _projectDetailTab switch
         {
-            "tasks" => BuildProjectTasksTab(project),
             "connections" => BuildProjectConnectionsTab(project),
             "tools" => BuildProjectToolsTab(project),
             _ => BuildProjectNotesTab(project)
@@ -210,47 +206,6 @@ public partial class MainWindow
         section.Child = stack;
         return section;
     }
-    private Border ProjectTasksSection(ProjectProfile project, IReadOnlyList<TaskItem> tasks)
-    {
-        var section = new Border
-        {
-            Background = (WpfBrush)FindResource("PanelBrush"),
-            BorderBrush = ThemeBorderMain(),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(16),
-            Margin = new Thickness(6),
-            Width = IsListView(_viewScope) ? 760 : 340,
-            MinHeight = 150
-        };
-
-        var stack = BaseCardStack("Задачи проекта");
-        var actions = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
-        actions.Children.Add(ActionButton("Новая задача", () => AddTask()));
-        stack.Children.Add(actions);
-        if (tasks.Count == 0)
-        {
-            stack.Children.Add(Muted("Нет задач."));
-        }
-        else
-        {
-            foreach (var task in tasks.Take(5))
-            {
-                var row = ProjectEntityRow(
-                    $"{task.StartAt:dd.MM}: {task.Title}",
-                    () => EditTask(task),
-                    ImportanceBrush(task.Importance),
-                    () => EditTask(task),
-                    () => DeleteTask(task));
-                row.Width = IsListView(_viewScope) ? 700 : 280;
-                row.Margin = new Thickness(0, 3, 0, 3);
-                stack.Children.Add(row);
-            }
-        }
-
-        section.Child = stack;
-        return section;
-    }
     private Border ProjectToolsSection(ProjectProfile project)
     {
         var section = Card("Инструменты проекта");
@@ -267,7 +222,6 @@ public partial class MainWindow
     }
     private void StartFocusProject(ProjectProfile project)
     {
-        PauseRunningTaskIfProjectChanged(project);
         _selectedProject = project;
         _focusProject = project;
         _focusStartedAt = DateTime.Now;
@@ -299,13 +253,6 @@ public partial class MainWindow
         AddLog("OK", $"Рабочая область: {project.Name}");
         ShowProjectDetail(project, "notes");
     }
-    private void ToggleProjectPinned(ProjectProfile project)
-    {
-        project.IsPinned = !project.IsPinned;
-        _projectStore.Save(_projects);
-        AddLog("OK", project.IsPinned ? $"Проект закреплен: {project.Name}" : $"Проект откреплен: {project.Name}");
-        RefreshAfterPinnedChange();
-    }
     private void ApplyProjectTemplate(ProjectProfile project)
     {
         var template = _templates.Templates.FirstOrDefault();
@@ -333,21 +280,7 @@ public partial class MainWindow
             });
         }
 
-        foreach (var title in template.TaskTitles.Where(t => !_tasks.Tasks.Any(x => x.WorkspaceId == project.Id && x.Title == t)))
-        {
-            _tasks.Tasks.Add(new TaskItem
-            {
-                Title = title,
-                Description = $"Шаблонная задача проекта {project.Name}",
-                WorkspaceId = project.Id,
-                StartAt = DateTime.Now,
-                EndAt = DateTime.Now.AddHours(1),
-                ReminderAt = DateTime.Now
-            });
-        }
-
         _notesStore.Save(_notes);
-        _tasksStore.Save(_tasks);
         AddLog("OK", $"Шаблон применен к проекту: {project.Name}");
         ShowProjectDetail(project);
     }
@@ -362,7 +295,6 @@ public partial class MainWindow
             _projectStore.Save(_projects);
             _selectedProject = win.Workspace;
             AddLog("OK", $"Проект добавлен: {win.Workspace.Name}");
-            RefreshProjectSwitcher();
             ShowProjects();
         };
         win.Show();
@@ -378,7 +310,6 @@ public partial class MainWindow
             _projectStore.Save(_projects);
             _selectedProject = win.Workspace;
             AddLog("OK", $"Проект изменён: {win.Workspace.Name}");
-            RefreshProjectSwitcher();
             ShowProjects();
         };
         win.Show();
@@ -391,7 +322,6 @@ public partial class MainWindow
                 MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
 
         RemoveProjectFromWideS(project);
-        RefreshProjectSwitcher();
         AddLog("WARN", $"Проект удалён из WideS без удаления файлов: {project.Name}");
         ShowProjects();
     }
@@ -417,7 +347,6 @@ public partial class MainWindow
 
         Directory.Delete(project.ProjectFolder, true);
         RemoveProjectFromWideS(project);
-        RefreshProjectSwitcher();
         AddLog("WARN", $"Проект и папка удалены с диска: {project.Name}");
         ShowProjects();
     }
@@ -426,7 +355,6 @@ public partial class MainWindow
         _projects.Projects.Remove(project);
         foreach (var note in _notes.Notes.Where(n => n.WorkspaceId == project.Id)) note.WorkspaceId = null;
         foreach (var connection in _connections.Connections.Where(c => c.WorkspaceId == project.Id)) connection.WorkspaceId = null;
-        foreach (var task in _tasks.Tasks.Where(t => t.WorkspaceId == project.Id)) task.WorkspaceId = null;
         if (_selectedProject?.Id == project.Id) _selectedProject = _projects.Projects.FirstOrDefault();
         if (_focusProject?.Id == project.Id) _focusProject = null;
 
@@ -441,7 +369,6 @@ public partial class MainWindow
         var project = RequireProject();
         if (project is null) return;
         TouchProjectOpened(project);
-        RefreshProjectSwitcher();
         var explorer = ShellHelper.OpenPath(project.ProjectFolder);
         WindowPlacementService.MoveProcessToPrimaryAsync(explorer, "explorer");
         AddLog("OK", $"Открыта папка: {project.ProjectFolder}");
@@ -476,8 +403,7 @@ public partial class MainWindow
 
         if (IsListView(_viewScope))
         {
-            var row = ListRow(project.Name, () => ShowProjectDetail(project), project.IsPinned ? (WpfBrush)FindResource("WarnBrush") : null,
-                FavoriteIconButton(project.IsPinned, () => ToggleProjectPinned(project)),
+            var row = ListRow(project.Name, () => ShowProjectDetail(project), null,
                 EditIconButton(() => EditProject(project)));
             row.ToolTip = $"Статус: {UiHelpers.ProjectStatusDisplay(project.Status)}";
             return row;
@@ -497,7 +423,6 @@ public partial class MainWindow
         var stack = BaseCardStack(project.Name);
         layout.Children.Add(stack);
         layout.Children.Add(EditIconButton(() => EditProject(project)));
-        layout.Children.Add(FavoriteIconButton(project.IsPinned, () => ToggleProjectPinned(project), 34));
         layout.Children.Add(ProjectMoreButton(project));
         stack.Children.Add(Muted(project.ProjectFolder));
         stack.Children.Add(UiHelpers.TypeBadge(UiHelpers.ProjectStatusDisplay(project.Status)));
@@ -525,8 +450,6 @@ public partial class MainWindow
             menu.Items.Add(item);
         }
 
-        AddItem(project.IsPinned ? "Убрать из избранного" : "Добавить в избранное", () => ToggleProjectPinned(project));
-        menu.Items.Add(new Separator());
         if (!project.Status.Equals("Active", StringComparison.OrdinalIgnoreCase)) AddItem("Сделать активным", () => SetProjectStatus(project, "Active"));
         if (!project.Status.Equals("Paused", StringComparison.OrdinalIgnoreCase)) AddItem("Поставить на паузу", () => SetProjectStatus(project, "Paused"));
         if (!project.Status.Equals("Archive", StringComparison.OrdinalIgnoreCase)) AddItem("Переместить в архив", () => SetProjectStatus(project, "Archive"));
@@ -584,7 +507,6 @@ public partial class MainWindow
 
         var actions = CompactRowActions(
             CompactActionButton("Открыть", () => ShowProjectDetail(project)),
-            CompactIconButton(FavoriteIconButton(project.IsPinned, () => ToggleProjectPinned(project), 28)),
             CompactIconButton(EditIconButton(() => EditProject(project))));
         AddCell(grid, 3, actions);
 
@@ -595,17 +517,12 @@ public partial class MainWindow
     {
         var root = new StackPanel { Margin = new Thickness(8) };
         var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-        WpfTextBox search = null!;
-        var list = ItemsPanel();
+        var list = new StackPanel { Margin = new Thickness(0) };
         void Render()
         {
             list.Children.Clear();
-            var query = UiHelpers.EffectiveText(search);
             var notes = _notes.Notes
                          .Where(n => n.WorkspaceId == project.Id)
-                         .Where(n => string.IsNullOrWhiteSpace(query) ||
-                                     n.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                                     n.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
                          .OrderByDescending(n => n.UpdatedAt)
                          .ToList();
 
@@ -615,61 +532,15 @@ public partial class MainWindow
                 return;
             }
 
-            if (IsTableView(_viewScope) && list is StackPanel)
-            {
-                list.Children.Add(NoteTableHeader());
-            }
+            list.Children.Add(NoteTableHeader());
 
             foreach (var note in notes)
             {
-                list.Children.Add(NoteCard(note));
+                list.Children.Add(NoteCompactRow(note));
             }
         }
-        search = SearchBox("Поиск заметок", Render);
-        top.Children.Add(search);
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
         top.Children.Add(ActionButton("Импорт TXT", () => ManualImportTxtNotes(project), false));
-        root.Children.Add(top);
-        Render();
-        root.Children.Add(list);
-        return root;
-    }
-    private FrameworkElement BuildProjectTasksTab(ProjectProfile project)
-    {
-        var root = new StackPanel { Margin = new Thickness(8) };
-        var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-        var list = ItemsPanel();
-        void Render()
-        {
-            list.Children.Clear();
-            var tasks = _tasks.Tasks
-                .Where(t => t.WorkspaceId == project.Id)
-                .Where(t => _projectTasksArchive ? t.IsDone : !t.IsDone)
-                .OrderByDescending(t => t.StartAt)
-                .ToList();
-
-            if (tasks.Count == 0)
-            {
-                list.Children.Add(UiHelpers.EmptyState("Нет задач", _projectTasksArchive ? "Архив пуст." : "Создайте задачу.", "Новая задача", () => AddTask()));
-                return;
-            }
-
-            if (IsTableView(_viewScope) && list is StackPanel)
-            {
-                list.Children.Add(TaskTableHeader());
-            }
-
-            foreach (var task in tasks)
-            {
-                list.Children.Add(TaskCard(task));
-            }
-        }
-        top.Children.Add(ActionButton("Новая задача", () => AddTask()));
-        top.Children.Add(ActionButton(_projectTasksArchive ? "Активные" : "Архив", () =>
-        {
-            _projectTasksArchive = !_projectTasksArchive;
-            ShowProjectDetail(project, "tasks");
-        }, false));
         root.Children.Add(top);
         Render();
         root.Children.Add(list);
@@ -679,7 +550,7 @@ public partial class MainWindow
     {
         var root = new DockPanel();
         var toolbar = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-        System.Windows.Controls.Panel list = ItemsPanel();
+        System.Windows.Controls.Panel list = new StackPanel { Margin = new Thickness(0) };
         WpfTextBox search = null!;
 
         void Render()
@@ -702,20 +573,14 @@ public partial class MainWindow
                 return;
             }
 
-            if (IsTableView(_viewScope) && items.Count > 0)
-            {
-                list.Children.Add(ConnectionTableHeader());
-            }
+            list.Children.Add(ConnectionTableHeader());
 
             foreach (var connection in items)
             {
-                list.Children.Add(ConnectionCard(connection));
+                list.Children.Add(ConnectionCompactRow(connection));
             }
 
-            if (items.Count > 0 && IsTableView(_viewScope))
-            {
-                list.Children.Add(Muted($"{items.Count} подключений · сортировка по названию"));
-            }
+            list.Children.Add(Muted($"{items.Count} подключений · сортировка по названию"));
         }
 
         search = SearchBox("Поиск подключения", Render);
@@ -745,7 +610,6 @@ public partial class MainWindow
         actions.Children.Add(ActionButton("Скопировать в AI", CopyForAiSelected, false));
         actions.Children.Add(ActionButton("Отчет дня", BuildDailyReport, false));
         actions.Children.Add(ActionButton("Шаблон", () => ApplyProjectTemplate(project), false));
-        actions.Children.Add(ActionButton("DropZone", OpenDropZoneFolder, false));
         stack.Children.Add(actions);
         card.Child = stack;
         root.Children.Add(card);

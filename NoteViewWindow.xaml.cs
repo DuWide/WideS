@@ -16,7 +16,6 @@ public partial class NoteViewWindow : Window
         _note = note;
         _originalText = note.Text ?? "";
         HeaderTitle.Text = string.IsNullOrWhiteSpace(note.Title) ? "(без заголовка)" : note.Title;
-        MetaText.Text = $"{note.Category} · {note.UpdatedAt:yyyy-MM-dd HH:mm}";
         BodyText.Text = _originalText;
         UiHelpers.BuildNotePreview(PreviewPanel, _originalText);
         BodyText.TextChanged += (_, _) => UiHelpers.BuildNotePreview(PreviewPanel, BodyText.Text);

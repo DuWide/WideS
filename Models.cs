@@ -13,7 +13,6 @@ public sealed class ProjectProfile
     public string Status { get; set; } = "Active";
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime? LastOpenedAt { get; set; }
-    public bool IsPinned { get; set; }
 
     public override string ToString() => string.IsNullOrWhiteSpace(Name) ? "(без названия)" : Name;
 }
@@ -34,7 +33,6 @@ public sealed class NoteItem
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsImportant { get; set; }
-    public bool IsPinned { get; set; }
     public Guid? WorkspaceId { get; set; }
 
     public override string ToString() => string.IsNullOrWhiteSpace(Title) ? "(без заголовка)" : Title;
@@ -55,7 +53,6 @@ public sealed class ConnectionItem
     public string EncryptedPassword { get; set; } = "";
     public string Comment { get; set; } = "";
     public string Tags { get; set; } = "";
-    public bool IsPinned { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public Guid? WorkspaceId { get; set; }
 
@@ -73,8 +70,6 @@ public sealed class AppSettingsData
     public string UserName { get; set; } = "Олег";
     public string LoginPasswordEncrypted { get; set; } = "";
     public bool DisableLogin { get; set; }
-    public List<string> BrowserCategories { get; set; } = ["AI Agents", "Основное", "Mail"];
-    public List<string> BrowserCategoryOrder { get; set; } = [];
     public bool IsFirstRunConfigured { get; set; }
     public string DockPosition { get; set; } = "Center";
     public bool DockAutoHide { get; set; }
@@ -89,30 +84,11 @@ public sealed class AppSettingsData
     public long TelegramLastUpdateId { get; set; }
     public long TelegramBotId { get; set; } = 778912409;
     public bool ToastNotificationsEnabled { get; set; } = true;
-    public bool PortalEnabled { get; set; }
-    public int PortalPort { get; set; } = 7788;
 }
 
 public sealed record SelectOption(string Label, string Value)
 {
     public override string ToString() => Label;
-}
-
-public sealed class AiAgentItem
-{
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Name { get; set; } = "";
-    public string Url { get; set; } = "";
-    public string Category { get; set; } = "AI Agents";
-    public bool IsPinned { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
-
-    public override string ToString() => string.IsNullOrWhiteSpace(Name) ? "(без названия)" : Name;
-}
-
-public sealed class AiAgentsStoreData
-{
-    public List<AiAgentItem> Agents { get; set; } = [];
 }
 
 public sealed class TaskItem
@@ -126,7 +102,6 @@ public sealed class TaskItem
     public string Importance { get; set; } = "Green";
     public Guid? WorkspaceId { get; set; }
     public bool IsDone { get; set; }
-    public bool IsPinned { get; set; }
     public DateTime? ReminderAt { get; set; } = DateTime.Now;
     public DateTime? LastNotifiedAt { get; set; }
     public string Recurrence { get; set; } = "None";

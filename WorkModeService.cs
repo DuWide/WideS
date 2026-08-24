@@ -8,49 +8,12 @@ public static class WorkModeService
 
     public static bool ShowMedia(string mode) => !mode.Equals(Focus, StringComparison.OrdinalIgnoreCase);
 
-    public static bool ShowBrowserActions(string mode) => !mode.Equals(Focus, StringComparison.OrdinalIgnoreCase);
-
     public static IReadOnlyList<(string Label, string Value)> ModeOptions() =>
     [
         ("Стандартный", Work),
         ("Фокус", Focus),
         ("Личный", Leisure)
     ];
-
-    public static IReadOnlyList<(string Label, string Key)> HomeQuickActions(string mode)
-    {
-        if (mode.Equals(Focus, StringComparison.OrdinalIgnoreCase))
-        {
-            return
-            [
-                ("Заметка", "note"),
-                ("Задача", "task"),
-                ("Проект", "project"),
-                ("Cursor", "cursor")
-            ];
-        }
-
-        if (mode.Equals(Leisure, StringComparison.OrdinalIgnoreCase))
-        {
-            return
-            [
-                ("Заметка", "note"),
-                ("Браузер", "browser"),
-                ("DropZone", "dropzone"),
-                ("Dock", "dock")
-            ];
-        }
-
-        return
-        [
-            ("Заметка", "note"),
-            ("Задача", "task"),
-            ("Подключение", "connection"),
-            ("Скопировать в AI", "context"),
-            ("Отчёт", "report"),
-            ("DropZone", "dropzone")
-        ];
-    }
 
     public static string DisplayName(string mode) => mode switch
     {
@@ -63,14 +26,14 @@ public static class WorkModeService
     {
         if (mode.Equals(Focus, StringComparison.OrdinalIgnoreCase))
         {
-            return "Фокус: задача, заметка, проект и Cursor без второстепенных действий.";
+            return "Фокус: медиапанель скрыта, рабочие разделы остаются доступны.";
         }
 
         if (mode.Equals(Leisure, StringComparison.OrdinalIgnoreCase))
         {
-            return "Личный: заметки, браузер, DropZone и медиапанель.";
+            return "Личный: рабочие разделы и медиапанель доступны.";
         }
 
-        return "Стандартный: доступны все разделы, быстрые действия и медиапанель.";
+        return "Стандартный: доступны все разделы и медиапанель.";
     }
 }

@@ -24,7 +24,7 @@ public partial class MainWindow
         SetTitle("Подключения", "Общие подключения, не привязанные к проектам");
         var root = new DockPanel();
         var top = new WrapPanel { Margin = new Thickness(8) };
-        var list = ItemsPanel();
+        var list = new StackPanel { Margin = new Thickness(0) };
         WpfTextBox search = null!;
         void Render()
         {
@@ -38,14 +38,14 @@ public partial class MainWindow
                                      c.Address.Contains(query, StringComparison.OrdinalIgnoreCase))
                          .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
                          .ToList();
-            if (IsTableView(_viewScope) && items.Count > 0)
+            if (items.Count > 0)
             {
                 list.Children.Add(ConnectionTableHeader());
             }
 
             foreach (var item in items)
             {
-                list.Children.Add(ConnectionCard(item));
+                list.Children.Add(ConnectionCompactRow(item));
             }
 
             if (list.Children.Count == 0) list.Children.Add(UiHelpers.EmptyState("Подключений нет", "Добавьте первое подключение.", "Новое подключение", () => AddConnection()));
@@ -64,8 +64,6 @@ public partial class MainWindow
         AddTypeFilter("AnyDesk");
         AddTypeFilter("RDP");
         top.Children.Add(ActionButton("Новое подключение", AddConnection));
-        top.Children.Add(ToolbarGap());
-        AddViewModeButtons(top, ShowConnections);
         DockPanel.SetDock(top, Dock.Top);
         root.Children.Add(top);
         Render();
@@ -138,60 +136,6 @@ public partial class MainWindow
             AddLog("ERR", $"RDP credentials: {ex.Message}");
         }
     }
-    private FrameworkElement ConnectionCard(ConnectionItem item)
-    {
-        if (IsTableView(_viewScope))
-        {
-            return ConnectionCompactRow(item);
-        }
-
-        if (IsListView(_viewScope))
-        {
-            return ListRow(item.Name, () => Connect(item), null,
-                FavoriteIconButton(item.IsPinned, () => ToggleConnectionPinned(item)),
-                EditIconButton(() => EditConnection(item)));
-        }
-
-        var card = Card(item.Name);
-        ApplyCardView(card);
-        card.Cursor = System.Windows.Input.Cursors.Hand;
-        card.MouseLeftButtonUp += (_, e) =>
-        {
-            if (!IsInsideButton(e.OriginalSource as DependencyObject))
-            {
-                Connect(item);
-            }
-        };
-        var layout = new Grid();
-        var stack = BaseCardStack(item.Name);
-        layout.Children.Add(stack);
-        layout.Children.Add(EditIconButton(() => EditConnection(item)));
-        layout.Children.Add(FavoriteIconButton(item.IsPinned, () => ToggleConnectionPinned(item), 34));
-        stack.Children.Add(Muted($"{item.Type} · {item.Address}"));
-        var reach = new TextBlock { FontSize = 11, Margin = new Thickness(0, 4, 0, 0) };
-        stack.Children.Add(reach);
-        StartReachabilityIndicator(item, reach);
-        if (!string.IsNullOrWhiteSpace(item.Comment))
-        {
-            stack.Children.Add(Text(item.Comment, 13, (WpfBrush)FindResource("MutedBrush"), new Thickness(0, 12, 0, 8)));
-        }
-        var primary = new WrapPanel { Margin = new Thickness(0, 12, 0, 4) };
-        primary.Children.Add(ActionButton("Подключиться", () => Connect(item)));
-        stack.Children.Add(primary);
-
-        var secondary = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
-        secondary.Children.Add(LinkAction("ID / адрес", () => Copy(item.Address, "Адрес/ID скопирован.")));
-        secondary.Children.Add(LinkAction("Логин", () => Copy(item.Login, "Логин скопирован.")));
-        secondary.Children.Add(LinkAction("Пароль", () => Copy(SecretService.Unprotect(item.EncryptedPassword), "Пароль скопирован.")));
-        if (item.Type.Equals("RDP", StringComparison.OrdinalIgnoreCase))
-        {
-            secondary.Children.Add(LinkAction("Удалить сохраненные RDP-учетные данные", () => DeleteSavedRdpCredentials(item)));
-        }
-        stack.Children.Add(secondary);
-        card.Child = layout;
-        return card;
-    }
-
     private Border ConnectionTableHeader() => BuildTableHeader(
         ("Название", new GridLength(1.8, GridUnitType.Star)),
         ("Тип", new GridLength(72)),
@@ -263,11 +207,6 @@ public partial class MainWindow
         edit.Margin = new Thickness(0, 0, 2, 0);
         actions.Children.Add(edit);
 
-        var favorite = FavoriteIconButton(item.IsPinned, () => ToggleConnectionPinned(item), 28);
-        favorite.Width = 28;
-        favorite.Height = 28;
-        favorite.MinWidth = 28;
-        actions.Children.Add(favorite);
         Grid.SetColumn(actions, 3);
 
         grid.Children.Add(name);

@@ -19,12 +19,6 @@ public static class TaskNotificationService
         ToastNotificationManagerCompat.OnActivated += toastArgs =>
         {
             var args = ToastArguments.Parse(toastArgs.Argument);
-            if (args.TryGetValue("source", out var source) && source == "portal")
-            {
-                NotificationActivated?.Invoke(new TaskNotificationAction { Action = "portal" });
-                return;
-            }
-
             if (!args.TryGetValue("taskId", out var taskIdRaw) || !Guid.TryParse(taskIdRaw, out var taskId))
             {
                 NotificationActivated?.Invoke(new TaskNotificationAction { Action = "activate" });
@@ -88,19 +82,6 @@ public static class TaskNotificationService
             {
                 toast.Tag = task.Id.ToString();
                 toast.Group = "WideS.Tasks";
-            });
-    }
-
-    public static void ShowPortalMessage(string title, string message)
-    {
-        new ToastContentBuilder()
-            .AddArgument("source", "portal")
-            .AddText(title)
-            .AddText(message)
-            .Show(toast =>
-            {
-                toast.Tag = "portal";
-                toast.Group = "WideS.Portal";
             });
     }
 

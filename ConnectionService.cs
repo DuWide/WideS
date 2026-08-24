@@ -125,6 +125,12 @@ public static class ConnectionService
                 : "AnyDesk.exe не найден. Пароль скопирован в буфер.";
         }
 
+        if (!string.IsNullOrWhiteSpace(password) &&
+            TryConnectAnyDeskWithPassword(anyDesk, connection.Address, password))
+        {
+            return $"Запущен AnyDesk для {connection.Address}, пароль передан автоматически.";
+        }
+
         try
         {
             var process = Process.Start(new ProcessStartInfo
@@ -147,6 +153,46 @@ public static class ConnectionService
             return string.IsNullOrWhiteSpace(password)
                 ? "AnyDesk открыт, ID скопирован в буфер."
                 : "AnyDesk открыт, пароль скопирован в буфер для вставки.";
+        }
+    }
+
+    private static bool TryConnectAnyDeskWithPassword(string anyDeskPath, string address, string password)
+    {
+        var target = address.Trim();
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return false;
+        }
+
+        try
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = anyDeskPath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true
+            };
+            startInfo.ArgumentList.Add(target);
+            startInfo.ArgumentList.Add("--with-password");
+
+            var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return false;
+            }
+
+            using (var input = process.StandardInput)
+            {
+                input.WriteLine(password);
+            }
+
+            WindowPlacementService.MoveProcessToPrimaryAsync(process, "AnyDesk");
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

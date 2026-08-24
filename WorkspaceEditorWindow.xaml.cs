@@ -25,7 +25,6 @@ public partial class WorkspaceEditorWindow : Window
                 EditorPath = source.EditorPath,
                 ReleasesFolder = source.ReleasesFolder,
                 Comment = source.Comment,
-                IsPinned = source.IsPinned,
                 Tags = source.Tags,
                 Status = source.Status,
                 LastOpenedAt = source.LastOpenedAt,

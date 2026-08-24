@@ -21,144 +21,48 @@ public partial class MainWindow
     {
         EnterView("tasks");
         _viewScope = "tasks";
-        SetTitle("Задачи", "Личные задачи с датами, важностью и напоминаниями");
+        SetTitle("Задачи", "Все задачи с датами и напоминаниями");
         var root = new DockPanel();
-        var toolbar = new StackPanel();
-        var row1 = UiHelpers.ToolbarRow();
-        var row2 = UiHelpers.ToolbarRow();
+        var toolbar = UiHelpers.ToolbarRow();
         var list = new StackPanel { Margin = new Thickness(0) };
-        WpfTextBox search = null!;
-        void AddTaskCards(IEnumerable<TaskItem> taskItems, System.Windows.Controls.Panel target)
-        {
-            foreach (var task in taskItems)
-            {
-                target.Children.Add(TaskCard(task));
-            }
-        }
 
         void Render()
         {
             list.Children.Clear();
-            var query = UiHelpers.EffectiveText(search);
-            var today = DateTime.Today;
-            var tasks = FilteredTasks(_showTaskArchive)
-                .Where(t => string.IsNullOrWhiteSpace(query) ||
-                            t.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                            t.Description.Contains(query, StringComparison.OrdinalIgnoreCase))
+            var tasks = _tasks.Tasks
+                .Where(t => _taskTab switch
+                {
+                    "В работе" => !t.IsDone && (IsTaskRunning(t) || IsTaskPaused(t)),
+                    "Запланировано" => !t.IsDone && !IsTaskRunning(t) && !IsTaskPaused(t),
+                    "Выполнено" => t.IsDone,
+                    _ => true
+                })
+                .OrderBy(t => t.IsDone)
+                .ThenByDescending(t => t.StartAt)
                 .ToList();
 
             if (tasks.Count == 0)
             {
-                list.Children.Add(UiHelpers.EmptyState("Задач нет", _showTaskArchive ? "Архив пуст." : "Создайте задачу или измените фильтр.", "Новая задача", () => AddTask()));
+                list.Children.Add(UiHelpers.EmptyState("Задач нет", "В этой категории пока нет задач.", "Новая задача", () => AddTask()));
                 return;
             }
 
-            if (IsTableView(_viewScope))
+            list.Children.Add(TaskTableHeader());
+            foreach (var task in tasks)
             {
-                list.Children.Add(TaskTableHeader());
-                foreach (var task in tasks
-                             .OrderBy(t => TaskGroupSortKey(t, today))
-                             .ThenByDescending(t => t.StartAt))
-                {
-                    list.Children.Add(TaskCard(task));
-                }
-
-                return;
-            }
-
-            var tileView = IsTileView(_viewScope);
-
-            if (_showTaskArchive)
-            {
-                if (tileView)
-                {
-                    var wrap = new WrapPanel { Margin = new Thickness(0) };
-                    AddTaskCards(tasks.OrderByDescending(t => t.CreatedAt), wrap);
-                    list.Children.Add(wrap);
-                }
-                else
-                {
-                    AddTaskCards(tasks.OrderByDescending(t => t.CreatedAt), list);
-                }
-            }
-            else
-            {
-                foreach (var group in tasks.GroupBy(t => TaskGroupKey(t, today)).OrderBy(g => g.Key switch
-                {
-                    "В работе" => 0,
-                    "На паузе" => 1,
-                    "Просрочено" => 2,
-                    "Сегодня" => 3,
-                    "Завтра" => 4,
-                    "Без даты" => 5,
-                    _ => 6
-                }))
-                {
-                    list.Children.Add(TaskGroupHeader(group.Key, stretch: tileView));
-                    var ordered = group.OrderByDescending(t => t.CreatedAt);
-                    if (tileView)
-                    {
-                        var wrap = new WrapPanel { Margin = new Thickness(0) };
-                        AddTaskCards(ordered, wrap);
-                        list.Children.Add(wrap);
-                    }
-                    else
-                    {
-                        AddTaskCards(ordered, list);
-                    }
-                }
+                list.Children.Add(TaskCompactRow(task));
             }
         }
 
-        search = SearchBox("Поиск задач", Render);
-        row1.Children.Add(search);
-        row1.Children.Add(ActionButton("Новая задача", () => AddTask()));
-        row1.Children.Add(ActionButton(_showTaskArchive ? "Активные" : "Архив", () =>
+        toolbar.Children.Add(ActionButton("Новая задача", () => AddTask()));
+        foreach (var tab in new[] { "Все", "В работе", "Запланировано", "Выполнено" })
         {
-            _showTaskArchive = !_showTaskArchive;
-            ShowTasks();
-        }, false));
-
-        var includeProjectTasks = new System.Windows.Controls.CheckBox
-        {
-            Content = "Задачи проектов",
-            IsChecked = _includeProjectTasks,
-            Margin = new Thickness(8, 8, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = (WpfBrush)FindResource("TextBrush")
-        };
-        includeProjectTasks.Checked += (_, _) => UpdateIncludeProjectTasks();
-        includeProjectTasks.Unchecked += (_, _) => UpdateIncludeProjectTasks();
-        row1.Children.Add(includeProjectTasks);
-
-        void UpdateIncludeProjectTasks()
-        {
-            _includeProjectTasks = includeProjectTasks.IsChecked == true;
-            Render();
+            toolbar.Children.Add(FilterButton(tab, _taskTab == tab, () =>
+            {
+                _taskTab = tab;
+                ShowTasks();
+            }));
         }
-
-        var projectFilter = UiHelpers.CreateToolbarComboBox(180);
-        projectFilter.Items.Add("(все проекты)");
-        foreach (var p in _projects.Projects.OrderByDescending(p => p.CreatedAt)) projectFilter.Items.Add(p);
-        projectFilter.SelectedIndex = _taskProjectFilter is null ? 0 : Math.Max(0, _projects.Projects.OrderByDescending(p => p.CreatedAt).ToList().FindIndex(p => p.Id == _taskProjectFilter) + 1);
-        projectFilter.SelectionChanged += (_, _) =>
-        {
-            _taskProjectFilter = projectFilter.SelectedIndex <= 0
-                ? null
-                : _projects.Projects.OrderByDescending(p => p.CreatedAt).ElementAtOrDefault(projectFilter.SelectedIndex - 1)?.Id;
-            Render();
-        };
-        row2.Children.Add(projectFilter);
-        foreach (var imp in new[] { "Все", "Green", "Yellow", "Red" })
-        {
-            row2.Children.Add(FilterButton(imp == "Green" ? "Низкая" : imp == "Yellow" ? "Средняя" : imp == "Red" ? "Срочная" : "Все",
-                _taskImportanceFilter.Equals(imp, StringComparison.OrdinalIgnoreCase),
-                () => { _taskImportanceFilter = imp; ShowTasks(); }));
-        }
-        row2.Children.Add(ToolbarGap());
-        AddViewModeButtons(row2, ShowTasks);
-        toolbar.Children.Add(row1);
-        toolbar.Children.Add(row2);
         var toolbarShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = toolbar };
         DockPanel.SetDock(toolbarShell, Dock.Top);
         root.Children.Add(toolbarShell);
@@ -168,11 +72,7 @@ public partial class MainWindow
     }
     private void AddTask(bool forceCommon = false)
     {
-        var contextProject = GetCreationContextProject(forceCommon);
-        var source = contextProject is not null
-            ? new TaskItem { WorkspaceId = contextProject.Id }
-            : null;
-        var win = new TaskEditorWindow(_projects.Projects, source) { Owner = this };
+        var win = new TaskEditorWindow(null) { Owner = this };
         EditorWindowHelper.Register(win.Task.Id, win);
         win.Closed += (_, _) =>
         {
@@ -190,7 +90,7 @@ public partial class MainWindow
     {
         if (EditorWindowHelper.TryActivate(task.Id)) return;
 
-        var win = new TaskEditorWindow(_projects.Projects, task) { Owner = this };
+        var win = new TaskEditorWindow(task) { Owner = this };
         EditorWindowHelper.Register(task.Id, win);
         win.Closed += (_, _) =>
         {
@@ -237,22 +137,12 @@ public partial class MainWindow
     }
     private void RefreshTasksView()
     {
-        if (_viewScope == "project-detail" && _selectedProject is not null)
-        {
-            ShowProjectDetail(_selectedProject, "tasks");
-            return;
-        }
-
         if (_currentViewKey == "tasks")
         {
             ShowTasks();
             return;
         }
 
-        if (_currentViewKey == "home")
-        {
-            ShowHome();
-        }
     }
     private void ArchiveTask(TaskItem task)
     {
@@ -282,22 +172,10 @@ public partial class MainWindow
         _tasks.Tasks.Remove(task);
         _tasksStore.Save(_tasks);
         AddLog("WARN", $"Задача удалена: {task.Title}");
-        if (_viewScope == "project-detail" && _selectedProject is not null)
-        {
-            ShowProjectDetail(_selectedProject);
-            return;
-        }
         ShowTasks();
     }
     private void RefreshAfterTaskChange(TaskItem task)
     {
-        var project = task.WorkspaceId is { } id ? _projects.Projects.FirstOrDefault(p => p.Id == id) : null;
-        if (project is not null && _viewScope == "project-detail")
-        {
-            ShowProjectDetail(project);
-            return;
-        }
-
         ShowTasks();
     }
     private void CheckTaskReminders()
@@ -346,20 +224,6 @@ public partial class MainWindow
         foreach (var other in _tasks.Tasks.Where(t => t.Id != activeTaskId && IsTaskRunning(t)))
         {
             other.Status = "На паузе";
-        }
-    }
-
-    private void PauseRunningTaskIfProjectChanged(ProjectProfile? project)
-    {
-        var running = _tasks.Tasks.FirstOrDefault(IsTaskRunning);
-        if (running is null || running.WorkspaceId is null)
-        {
-            return;
-        }
-
-        if (project is null || running.WorkspaceId != project.Id)
-        {
-            PauseTask(running);
         }
     }
 
@@ -438,104 +302,6 @@ public partial class MainWindow
 
         return $"{Math.Max(0, (int)span.TotalMinutes)}м";
     }
-    private static int TaskGroupSortKey(TaskItem task, DateTime today) => TaskGroupKey(task, today) switch
-    {
-        "В работе" => 0,
-        "На паузе" => 1,
-        "Просрочено" => 2,
-        "Сегодня" => 3,
-        "Завтра" => 4,
-        "Без даты" => 5,
-        _ => 6
-    };
-
-    private FrameworkElement TaskCard(TaskItem task)
-    {
-        if (IsTableView(_viewScope))
-        {
-            return TaskCompactRow(task);
-        }
-
-        if (IsListView(_viewScope))
-        {
-            return ListRow(task.Title, () => EditTask(task), ImportanceBrush(task.Importance),
-                FavoriteIconButton(task.IsPinned, () => ToggleTaskPinned(task)),
-                EditIconButton(() => EditTask(task)));
-        }
-
-        var card = Card(task.Title);
-        ApplyCardView(card, 360);
-        card.MinHeight = 170;
-        card.BorderBrush = ImportanceBrush(task.Importance);
-        card.Cursor = System.Windows.Input.Cursors.Hand;
-        card.MouseLeftButtonUp += (_, e) =>
-        {
-            if (!IsInsideButton(e.OriginalSource as DependencyObject))
-            {
-                EditTask(task);
-            }
-        };
-        var layout = new Grid();
-        var stack = BaseCardStack(task.Title);
-        if (IsTaskRunning(task))
-        {
-            card.BorderBrush = (WpfBrush)FindResource("AccentBrush");
-            card.BorderThickness = new Thickness(2);
-            stack.Children.Insert(1, UiHelpers.TypeBadge("В работе"));
-        }
-        else if (IsTaskPaused(task))
-        {
-            card.BorderBrush = (WpfBrush)FindResource("WarnBrush");
-            card.BorderThickness = new Thickness(2);
-            stack.Children.Insert(1, UiHelpers.TypeBadge("На паузе"));
-        }
-        layout.Children.Add(stack);
-        layout.Children.Add(EditIconButton(() => EditTask(task)));
-        layout.Children.Add(FavoriteIconButton(task.IsPinned, () => ToggleTaskPinned(task), 34));
-        layout.Children.Add(new Border
-        {
-            Width = 14,
-            Height = 14,
-            CornerRadius = new CornerRadius(7),
-            Background = ImportanceBrush(task.Importance),
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(0, 42, 10, 0)
-        });
-        var meta = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-        meta.Children.Add(Muted($"{task.StartAt:dd.MM.yyyy HH:mm}"));
-        stack.Children.Add(meta);
-        stack.Children.Add(Muted(TaskStatusText(task)));
-        if (!string.IsNullOrWhiteSpace(task.Description))
-        {
-        stack.Children.Add(Text(Preview(task.Description, 220), 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 10, 0, 10)));
-        }
-        var buttons = new WrapPanel();
-        if (task.IsDone)
-        {
-            buttons.Children.Add(ActionButton("Вернуть", () => RestoreTask(task), false));
-        }
-        else if (IsTaskRunning(task))
-        {
-            buttons.Children.Add(ActionButton("Пауза", () => PauseTask(task), false));
-            buttons.Children.Add(ActionButton("Завершить", () => CompleteTaskWithRecurrence(task), false));
-        }
-        else if (IsTaskPaused(task))
-        {
-            buttons.Children.Add(ActionButton("Продолжить", () => StartTask(task, openEditor: false)));
-            buttons.Children.Add(ActionButton("Завершить", () => CompleteTaskWithRecurrence(task), false));
-        }
-        else
-        {
-            buttons.Children.Add(ActionButton("Начать", () => StartTask(task)));
-            buttons.Children.Add(ActionButton("Завершить", () => CompleteTaskWithRecurrence(task), false));
-        }
-        buttons.Children.Add(ActionButton("Удалить", () => DeleteTask(task), false));
-        stack.Children.Add(buttons);
-        card.Child = layout;
-        return card;
-    }
-
     private Border TaskTableHeader() => BuildTableHeader(
         ("Задача", new GridLength(2, GridUnitType.Star)),
         ("Дата", new GridLength(110)),
@@ -597,7 +363,6 @@ public partial class MainWindow
         }
 
         actions.Children.Add(CompactIconButton(EditIconButton(() => EditTask(task))));
-        actions.Children.Add(CompactIconButton(FavoriteIconButton(task.IsPinned, () => ToggleTaskPinned(task), 28)));
         AddCell(grid, 3, actions);
 
         return WrapTableRow(grid, () => EditTask(task));

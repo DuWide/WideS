@@ -23,56 +23,32 @@ public partial class MainWindow
         _viewScope = "notes";
         SetTitle("Заметки", "Общие заметки, не привязанные к проектам");
         var root = new DockPanel();
-        var top = new WrapPanel { Margin = new Thickness(8) };
-        var list = ItemsPanel();
-        WpfTextBox search = null!;
-        WpfTextBox tagFilter = null!;
+        var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        var list = new StackPanel { Margin = new Thickness(0) };
         void Render()
         {
             list.Children.Clear();
-            var query = UiHelpers.EffectiveText(search);
-            var tag = UiHelpers.EffectiveText(tagFilter);
             var notes = _notes.Notes
                          .Where(n => n.WorkspaceId is null)
-                         .Where(n => string.IsNullOrWhiteSpace(tag) ||
-                                     n.Tags.Contains(tag, StringComparison.OrdinalIgnoreCase))
-                         .Where(n => string.IsNullOrWhiteSpace(query) ||
-                                     n.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                                     n.Text.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                                     n.Tags.Contains(query, StringComparison.OrdinalIgnoreCase));
+                         .OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase)
+                         .ToList();
 
-            var ordered = IsTableView(_viewScope)
-                ? notes.OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase).ToList()
-                : notes.OrderByDescending(n => n.CreatedAt).ToList();
-
-            if (IsTableView(_viewScope) && ordered.Count > 0)
+            if (notes.Count > 0)
             {
                 list.Children.Add(NoteTableHeader());
             }
 
-            foreach (var note in ordered)
+            foreach (var note in notes)
             {
-                list.Children.Add(NoteCard(note));
+                list.Children.Add(NoteCompactRow(note));
             }
 
-            if (ordered.Count == 0)
+            if (notes.Count == 0)
             {
-                list.Children.Add(UiHelpers.EmptyState("Заметок нет", "Создайте первую заметку или измените фильтр.", "Новая заметка", () => AddNote()));
+                list.Children.Add(UiHelpers.EmptyState("Заметок нет", "Создайте первую заметку.", "Новая заметка", () => AddNote()));
             }
         }
-        tagFilter = UiHelpers.CreateSearchBox("Тег", Render, minWidth: 160);
-        if (!string.IsNullOrWhiteSpace(_noteTagFilter))
-        {
-            tagFilter.Text = _noteTagFilter;
-            tagFilter.Foreground = (WpfBrush)FindResource("TextBrush");
-        }
-        tagFilter.TextChanged += (_, _) => { _noteTagFilter = UiHelpers.EffectiveText(tagFilter); };
-        search = SearchBox("Поиск заметок", Render);
-        top.Children.Add(search);
-        top.Children.Add(tagFilter);
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
-        top.Children.Add(ToolbarGap());
-        AddViewModeButtons(top, ShowNotes);
         DockPanel.SetDock(top, Dock.Top);
         root.Children.Add(top);
         Render();
@@ -101,41 +77,30 @@ public partial class MainWindow
         _viewScope = "project-notes";
         SetTitle($"Заметки: {project.Name}", "Заметки, привязанные только к этому проекту");
         var root = new DockPanel();
-        var top = new WrapPanel { Margin = new Thickness(8) };
-        var list = ItemsPanel();
-        WpfTextBox search = null!;
+        var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        var list = new StackPanel { Margin = new Thickness(0) };
         void Render()
         {
             list.Children.Clear();
-            var query = UiHelpers.EffectiveText(search);
             var notes = _notes.Notes
                          .Where(n => n.WorkspaceId == project.Id)
-                         .Where(n => string.IsNullOrWhiteSpace(query) ||
-                                     n.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                                     n.Text.Contains(query, StringComparison.OrdinalIgnoreCase));
+                         .OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase)
+                         .ToList();
 
-            var ordered = IsTableView(_viewScope)
-                ? notes.OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase).ToList()
-                : notes.OrderByDescending(n => n.CreatedAt).ToList();
-
-            if (IsTableView(_viewScope) && ordered.Count > 0)
+            if (notes.Count > 0)
             {
                 list.Children.Add(NoteTableHeader());
             }
 
-            foreach (var note in ordered)
+            foreach (var note in notes)
             {
-                list.Children.Add(NoteCard(note));
+                list.Children.Add(NoteCompactRow(note));
             }
 
-            if (ordered.Count == 0) list.Children.Add(CardText("Пусто", "Заметки проекта не найдены."));
+            if (notes.Count == 0) list.Children.Add(CardText("Пусто", "Заметки проекта не найдены."));
         }
-        search = SearchBox("Поиск заметок проекта", Render);
-        top.Children.Add(search);
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
         top.Children.Add(ActionButton("Импорт TXT", () => ManualImportTxtNotes(project), false));
-        top.Children.Add(ToolbarGap());
-        AddViewModeButtons(top, () => ShowProjectNotes(project));
         DockPanel.SetDock(top, Dock.Top);
         root.Children.Add(top);
         Render();
@@ -182,62 +147,8 @@ public partial class MainWindow
     }
     private NoteEditorWindow CreateNoteEditor(NoteItem? source)
     {
-        var win = new NoteEditorWindow(_projects.Projects, source, SaveDetectedConnectionsFromNote) { Owner = this };
+        var win = new NoteEditorWindow(_projects.Projects, source) { Owner = this };
         return win;
-    }
-
-    private int SaveDetectedConnectionsFromNote(NoteItem note, IReadOnlyList<ConnectionItem> detected)
-    {
-        var created = 0;
-        foreach (var item in detected)
-        {
-            item.WorkspaceId = note.WorkspaceId;
-            if (_connections.Connections.Any(c =>
-                    c.Address.Equals(item.Address, StringComparison.OrdinalIgnoreCase) &&
-                    c.Type.Equals(item.Type, StringComparison.OrdinalIgnoreCase) &&
-                    c.WorkspaceId == item.WorkspaceId))
-            {
-                continue;
-            }
-
-            _connections.Connections.Add(item);
-            created++;
-        }
-
-        if (created > 0)
-        {
-            _connectionsStore.Save(_connections);
-            AddLog("OK", $"Из заметки создано подключений: {created}");
-        }
-
-        return created;
-    }
-
-    private void ScanNoteConnections(NoteItem note)
-    {
-        var detected = NoteConnectionDetector.Detect(note.Text, note.Title);
-        if (detected.Count == 0)
-        {
-            WpfMessageBox.Show(this, "В заметке не найдено подключений для создания.", "WideS");
-            return;
-        }
-
-        var preview = string.Join("\n", detected.Select(item =>
-            $"• {item.Name} [{item.Type}] {item.Address}" +
-            (string.IsNullOrWhiteSpace(item.Login) ? "" : $" / {item.Login}")));
-        if (WpfMessageBox.Show(this,
-                $"Найдено подключений: {detected.Count}\n\n{preview}\n\nСоздать?",
-                "WideS",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-
-        var created = SaveDetectedConnectionsFromNote(note, detected);
-        WpfMessageBox.Show(this,
-            created > 0 ? $"Создано подключений: {created}." : "Новых подключений не создано — такие уже есть.",
-            "WideS");
     }
 
     private void DeleteNote(NoteItem note)
@@ -343,50 +254,8 @@ public partial class MainWindow
         AddLog("OK", $"TXT добавлены в заметки проекта: {imported}");
         ShowProjectDetail(project);
     }
-    private FrameworkElement NoteCard(NoteItem note)
-    {
-        if (IsTableView(_viewScope))
-        {
-            return NoteCompactRow(note);
-        }
-
-        if (IsListView(_viewScope))
-        {
-            return ListRow(note.IsImportant ? "! " + note.Title : note.Title, () => ViewNote(note), note.IsImportant ? (WpfBrush)FindResource("WarnBrush") : null,
-                FavoriteIconButton(note.IsPinned, () => ToggleNotePinned(note)),
-                EditIconButton(() => EditNote(note)));
-        }
-
-        var card = Card(note.IsImportant ? "! " + note.Title : note.Title);
-        ApplyCardView(card);
-        card.Cursor = System.Windows.Input.Cursors.Hand;
-        card.MouseLeftButtonUp += (_, e) =>
-        {
-            if (!IsInsideButton(e.OriginalSource as DependencyObject))
-            {
-                ViewNote(note);
-            }
-        };
-        var layout = new Grid();
-        var stack = BaseCardStack(note.IsImportant ? "! " + note.Title : note.Title);
-        layout.Children.Add(stack);
-        layout.Children.Add(EditIconButton(() => EditNote(note)));
-        layout.Children.Add(FavoriteIconButton(note.IsPinned, () => ToggleNotePinned(note), 34));
-        stack.Children.Add(Muted($"{note.Category} · {note.UpdatedAt:yyyy-MM-dd HH:mm}"));
-        stack.Children.Add(Text(Preview(note.Text, 230), 14, (WpfBrush)FindResource("TextBrush"), new Thickness(0, 12, 0, 12)));
-        var buttons = new WrapPanel();
-        buttons.Children.Add(ActionButton("Подключения", () => ScanNoteConnections(note), false));
-        buttons.Children.Add(ActionButton("Копировать", () => Copy(note.Text, "Текст заметки скопирован."), false));
-        buttons.Children.Add(ActionButton("Удалить", () => DeleteNote(note), false));
-        buttons.Children.Add(ActionButton("Удалить с диска", () => DeleteNoteFromDisk(note), false));
-        stack.Children.Add(buttons);
-        card.Child = layout;
-        return card;
-    }
-
     private Border NoteTableHeader() => BuildTableHeader(
         ("Заголовок", new GridLength(2, GridUnitType.Star)),
-        ("Категория", new GridLength(100)),
         ("Обновлено", new GridLength(120)),
         ("Действия", GridLength.Auto));
 
@@ -394,7 +263,6 @@ public partial class MainWindow
     {
         var grid = CreateTableGrid(
             new GridLength(2, GridUnitType.Star),
-            new GridLength(100),
             new GridLength(120),
             GridLength.Auto);
 
@@ -409,14 +277,11 @@ public partial class MainWindow
             ToolTip = title
         };
         AddCell(grid, 0, name);
-        AddCell(grid, 1, Muted(note.Category));
-        AddCell(grid, 2, Muted(note.UpdatedAt.ToString("dd.MM.yyyy HH:mm")));
+        AddCell(grid, 1, Muted(note.UpdatedAt.ToString("dd.MM.yyyy HH:mm")));
 
         var actions = CompactRowActions(
-            CompactActionButton("Подк.", () => ScanNoteConnections(note)),
-            CompactIconButton(EditIconButton(() => EditNote(note))),
-            CompactIconButton(FavoriteIconButton(note.IsPinned, () => ToggleNotePinned(note), 28)));
-        AddCell(grid, 3, actions);
+            CompactIconButton(EditIconButton(() => EditNote(note))));
+        AddCell(grid, 2, actions);
 
         return WrapTableRow(grid, () => ViewNote(note));
     }

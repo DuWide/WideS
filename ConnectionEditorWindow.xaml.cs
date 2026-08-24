@@ -23,7 +23,6 @@ public partial class ConnectionEditorWindow : Window
                 Login = source.Login,
                 EncryptedPassword = source.EncryptedPassword,
                 Comment = source.Comment,
-                IsPinned = source.IsPinned,
                 WorkspaceId = source.WorkspaceId
             };
         LoadData();

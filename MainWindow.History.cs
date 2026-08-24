@@ -63,9 +63,9 @@ public partial class MainWindow
             "Рабочая область:",
             _focusProject?.Id == project.Id && _focusStartedAt is not null ? $"Начата: {_focusStartedAt:HH:mm}" : "Рабочая область не запущена.",
             "",
-            "Задачи:",
+            "Задачи за день:",
         };
-        lines.AddRange(_tasks.Tasks.Where(t => t.WorkspaceId == project.Id && t.StartAt >= since).Select(t => $"- {(t.IsDone ? "[x]" : "[ ]")} {t.Title} ({t.StartAt:HH:mm}-{t.EndAt:HH:mm})"));
+        lines.AddRange(_tasks.Tasks.Where(t => t.StartAt >= since).Select(t => $"- {(t.IsDone ? "[x]" : "[ ]")} {t.Title} ({t.StartAt:HH:mm}-{t.EndAt:HH:mm})"));
         lines.Add("");
         lines.Add("Заметки:");
         lines.AddRange(_notes.Notes.Where(n => n.WorkspaceId == project.Id && n.UpdatedAt >= since).Select(n => $"- {n.Title}"));

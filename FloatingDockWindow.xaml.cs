@@ -14,9 +14,7 @@ public partial class FloatingDockWindow : Window
     private readonly MediaService _mediaService;
     private readonly Action _onNewTask;
     private readonly Action _onNewNote;
-    private readonly Action _onDropZone;
     private readonly Action _onOpenMain;
-    private readonly Action<string[]> _onFilesDropped;
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private IReadOnlyList<ConnectionItem> _connections = [];
     private Action<ConnectionItem>? _onConnect;
@@ -29,21 +27,16 @@ public partial class FloatingDockWindow : Window
         MediaService mediaService,
         Action onNewTask,
         Action onNewNote,
-        Action onDropZone,
-        Action onOpenMain,
-        Action<string[]> onFilesDropped)
+        Action onOpenMain)
     {
         InitializeComponent();
         _mediaService = mediaService;
         _onNewTask = onNewTask;
         _onNewNote = onNewNote;
-        _onDropZone = onDropZone;
         _onOpenMain = onOpenMain;
-        _onFilesDropped = onFilesDropped;
 
         TaskButton.Content = DockContent("task", "Задача");
         NoteButton.Content = DockContent("note", "Заметка");
-        DropButton.Content = DockContent("drop", "DropZone");
         OpenButton.Content = DockContent("open", "Открыть");
         ConnButton.Content = DockContent("connection", "RDP");
         DockNpPrev.Content = MakeIcon("prev", 14);
@@ -51,8 +44,6 @@ public partial class FloatingDockWindow : Window
         DockNpNext.Content = MakeIcon("next", 14);
         HideButton.Content = MakeIcon("close", 14);
 
-        DragOver += FloatingDockWindow_DragOver;
-        Drop += FloatingDockWindow_Drop;
         Deactivated += (_, _) => { if (_autoHide) HideDock(); };
         Loaded += (_, _) => PositionDock();
 
@@ -102,12 +93,6 @@ public partial class FloatingDockWindow : Window
         BeginAnimation(OpacityProperty, anim);
     }
 
-    private void FloatingDockWindow_DragOver(object sender, System.Windows.DragEventArgs e)
-    {
-        e.Effects = System.Windows.DragDropEffects.Copy;
-        Root.BorderBrush = (WpfBrush)FindResource("AccentBrush");
-    }
-
     private void PositionDock()
     {
         var area = SystemParameters.WorkArea;
@@ -146,17 +131,8 @@ public partial class FloatingDockWindow : Window
         }
     }
 
-    private void FloatingDockWindow_Drop(object sender, System.Windows.DragEventArgs e)
-    {
-        Root.SetResourceReference(Border.BorderBrushProperty, "AccentBorderBrush");
-        if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop)) return;
-        var files = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
-        if (files.Length > 0) _onFilesDropped(files);
-    }
-
     private void Task_Click(object sender, RoutedEventArgs e) => _onNewTask();
     private void Note_Click(object sender, RoutedEventArgs e) => _onNewNote();
-    private void Drop_Click(object sender, RoutedEventArgs e) => _onDropZone();
     private void Open_Click(object sender, RoutedEventArgs e) => _onOpenMain();
     private void Hide_Click(object sender, RoutedEventArgs e) => HideDock();
 

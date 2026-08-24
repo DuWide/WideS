@@ -76,7 +76,7 @@ public partial class MainWindow
             }
             _settingsStore.Save(_settings);
             AddLog("OK", "Настройки входа сохранены.");
-            ShowHome();
+            ShowProjects();
         }));
         accountCard.Child = account;
         panel.Children.Add(accountCard);
@@ -318,69 +318,6 @@ public partial class MainWindow
         }));
         notifyCard.Child = notifyStack;
         panel.Children.Add(notifyCard);
-
-        var portalCard = Card("Локальный портал");
-        portalCard.Width = 720;
-        var portalStack = BaseCardStack("Локальный портал");
-        var portalEnabled = new System.Windows.Controls.CheckBox
-        {
-            Content = "Включить веб-портал",
-            IsChecked = _settings.PortalEnabled,
-            Foreground = (WpfBrush)FindResource("TextBrush"),
-            Margin = new Thickness(0, 0, 0, 8)
-        };
-        portalStack.Children.Add(portalEnabled);
-        portalStack.Children.Add(Muted("1) Поставьте галочку и нажмите «Сохранить портал»."));
-        portalStack.Children.Add(Muted("2) Нажмите «Открыть в браузере» — должна открыться страница http://127.0.0.1:7788"));
-        portalStack.Children.Add(Muted("3) С телефона/другого ПК: тот же Wi‑Fi, адрес http://ВАШ_IP:7788 (IP покажется в логе после сохранения)."));
-        var portalPort = new WpfTextBox
-        {
-            Text = _settings.PortalPort.ToString(),
-            MinWidth = 120,
-            Width = 160,
-            Margin = new Thickness(0, 8, 0, 8)
-        };
-        portalStack.Children.Add(Muted("Порт"));
-        portalStack.Children.Add(portalPort);
-        if (_portalService.IsRunning)
-        {
-            portalStack.Children.Add(Muted($"Работает: {string.Join(" | ", _portalService.BoundUrls)}"));
-        }
-        else if (!string.IsNullOrWhiteSpace(_portalService.LastError))
-        {
-            portalStack.Children.Add(Muted($"Ошибка: {_portalService.LastError}"));
-        }
-
-        var portalButtons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
-        portalButtons.Children.Add(ActionButton("Сохранить портал", () =>
-        {
-            _settings.PortalEnabled = portalEnabled.IsChecked == true;
-            if (int.TryParse(portalPort.Text.Trim(), out var port) && port is > 0 and < 65536)
-            {
-                _settings.PortalPort = port;
-            }
-            _settingsStore.Save(_settings);
-            RestartPortal();
-            if (_settings.PortalEnabled && _portalService.IsRunning)
-            {
-                Copy(PrimaryPortalUrl(), "Ссылка портала скопирована.");
-            }
-            AddLog("OK", _settings.PortalEnabled ? "Портал перезапущен." : "Портал остановлен.");
-            ShowSettings();
-        }));
-        portalButtons.Children.Add(ActionButton("Открыть в браузере", OpenPortalInBrowser, false));
-        portalButtons.Children.Add(ActionButton("Копировать ссылку", () =>
-        {
-            if (!_portalService.IsRunning)
-            {
-                WpfMessageBox.Show(this, "Сначала включите и сохраните портал.", "WideS");
-                return;
-            }
-            Copy(PrimaryPortalUrl(), "Ссылка портала скопирована.");
-        }, false));
-        portalStack.Children.Add(portalButtons);
-        portalCard.Child = portalStack;
-        panel.Children.Add(portalCard);
 
         var dataCard = Card("Данные");
         dataCard.Width = 720;

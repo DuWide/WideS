@@ -7,15 +7,13 @@ namespace DevCockpit;
 
 public partial class TaskEditorWindow : Window
 {
-    private readonly List<ProjectProfile> _projects;
     private string _importance = "Green";
     public bool Saved { get; private set; }
     public TaskItem Task { get; private set; }
 
-    public TaskEditorWindow(IEnumerable<ProjectProfile> projects, TaskItem? source = null)
+    public TaskEditorWindow(TaskItem? source = null)
     {
         InitializeComponent();
-        _projects = projects.ToList();
         Task = source is null
             ? new TaskItem()
             : new TaskItem
@@ -29,7 +27,6 @@ public partial class TaskEditorWindow : Window
                 Importance = source.Importance,
                 WorkspaceId = source.WorkspaceId,
                 IsDone = source.IsDone,
-                IsPinned = source.IsPinned,
                 ReminderAt = source.ReminderAt,
                 LastNotifiedAt = source.LastNotifiedAt,
                 Recurrence = source.Recurrence,
@@ -38,10 +35,6 @@ public partial class TaskEditorWindow : Window
                 CreatedAt = source.CreatedAt,
                 WorkStartedAt = source.WorkStartedAt
             };
-
-        ProjectBox.Items.Add("(без проекта)");
-        foreach (var project in _projects) ProjectBox.Items.Add(project);
-        ProjectBox.SelectedItem = _projects.FirstOrDefault(p => p.Id == Task.WorkspaceId) ?? ProjectBox.Items[0];
 
         RecurrenceBox.Items.Add("None");
         RecurrenceBox.Items.Add("Daily");
@@ -62,8 +55,6 @@ public partial class TaskEditorWindow : Window
         if (!string.Equals(DescriptionBox.Text.Trim(), Task.Description, StringComparison.Ordinal)) return true;
         if (_importance != Task.Importance) return true;
         if ((RecurrenceBox.SelectedItem?.ToString() ?? "None") != (string.IsNullOrWhiteSpace(Task.Recurrence) ? "None" : Task.Recurrence)) return true;
-        var projectId = ProjectBox.SelectedItem is ProjectProfile project ? project.Id : (Guid?)null;
-        if (projectId != Task.WorkspaceId) return true;
         if (!TryReadDateTime(StartDatePicker, StartHourBox, StartMinuteBox, out var startAt)) return true;
         return startAt != Task.StartAt;
     }
@@ -93,7 +84,6 @@ public partial class TaskEditorWindow : Window
         Task.EndAt = startAt.AddHours(1);
         Task.Importance = _importance;
         Task.Recurrence = RecurrenceBox.SelectedItem?.ToString() ?? "None";
-        Task.WorkspaceId = ProjectBox.SelectedItem is ProjectProfile project ? project.Id : null;
         if (!Task.Status.Equals("Выполняется", StringComparison.OrdinalIgnoreCase))
         {
             Task.ReminderAt = startAt;

@@ -9,7 +9,6 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         Topmost="True"
-        AllowDrop="True"
         Background="Transparent">
     <Border x:Name="Root" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource AccentBorderBrush}" BorderThickness="1"
             CornerRadius="10" Padding="10,8"
@@ -24,7 +23,6 @@
             <!-- Быстрые действия -->
             <Button x:Name="TaskButton" Style="{StaticResource DockButton}" Click="Task_Click" ToolTip="Новая задача" />
             <Button x:Name="NoteButton" Style="{StaticResource DockButton}" Click="Note_Click" ToolTip="Новая заметка" />
-            <Button x:Name="DropButton" Style="{StaticResource DockButton}" Click="Drop_Click" ToolTip="DropZone — можно перетащить файл на панель" />
             <Button x:Name="OpenButton" Style="{StaticResource DockButton}" Click="Open_Click" ToolTip="Открыть WideS" />
             <Button x:Name="ConnButton" Style="{StaticResource DockButton}" Click="Conn_Click" ToolTip="Подключения" />
 

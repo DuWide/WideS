@@ -22,20 +22,20 @@ public static class AppPaths
     public static string NotesJson => Path.Combine(DataDirectory, "notes.json");
     public static string ConnectionsJson => Path.Combine(DataDirectory, "connections.json");
     public static string SettingsJson => Path.Combine(DataDirectory, "settings.json");
-    public static string AiAgentsJson => Path.Combine(DataDirectory, "ai-agents.json");
     public static string TasksJson => Path.Combine(DataDirectory, "tasks.json");
     public static string ActivityJson => Path.Combine(DataDirectory, "activity.json");
     public static string ProjectTemplatesJson => Path.Combine(DataDirectory, "project-templates.json");
+    public static string WebAppsDirectory => Path.Combine(DataDirectory, "web-apps");
 
     public static void EnsureDataDirectory()
     {
         Directory.CreateDirectory(DataDirectory);
+        Directory.CreateDirectory(WebAppsDirectory);
         MigrateFromLegacyAppData();
         MigrateIfMissing("projects.json");
         MigrateIfMissing("notes.json");
         MigrateIfMissing("connections.json");
         MigrateIfMissing("settings.json");
-        MigrateIfMissing("ai-agents.json");
         MigrateIfMissing("tasks.json");
         MigrateIfMissing("activity.json");
         MigrateIfMissing("project-templates.json");
@@ -67,15 +67,6 @@ public static class AppPaths
     public static string TodayWorkDay(ProjectProfile project)
     {
         return Path.Combine(project.ProjectFolder, "_WorkDay", DateTime.Now.ToString("yyyy-MM-dd"));
-    }
-
-    public const string DropZoneFolderName = "Временная папка DropZone";
-
-    public static string GetDropZoneFolder(ProjectProfile project)
-    {
-        var path = Path.Combine(project.ProjectFolder, DropZoneFolderName);
-        Directory.CreateDirectory(path);
-        return path;
     }
 
     public static string EnsureTodayWorkDay(ProjectProfile project)

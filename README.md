@@ -1,6 +1,14 @@
 # WideS (DevCockpit)
 
-Personal developer cockpit: проекты, задачи, заметки, подключения, DropZone.
+Personal developer cockpit: проекты, глобальные задачи, заметки, подключения,
+встроенные мессенджеры и музыка.
+
+Основной экран WideS — «Проекты». Единая боковая панель содержит проекты, заметки,
+подключения, задачи, мессенджеры, музыку и настройки. Поиск и Floating Dock доступны
+в правой части заголовка окна.
+
+Задачи отображаются таблицей и разделены на четыре вкладки: «Все», «В работе»,
+«Запланировано», «Выполнено». Заметки и подключения также используют табличный вид.
 
 Визуальная система v1.5:
 
@@ -74,7 +82,8 @@ PNG → ICO: `tools\BuildIcon.ps1` (см. `tools/README.md`).
 | Задача | Где смотреть |
 |--------|----------------|
 | Стили UI | `App.xaml`, `Themes/DesignSystem.xaml`, `ThemeService.cs` |
-| Навигация, экраны | `MainWindow.xaml.cs`, `MainWindow.Polish.cs` |
+| Навигация, экраны | `MainWindow.xaml.cs`, `MainWindow.Polish.cs`, `MainWindow.*.cs` |
+| Встроенные веб-приложения | `MainWindow.WebApps.cs`, `WebAppsHostView.cs`, `WebAppView.cs` |
 | Установщик | `setup/README.md`, `setup/WideS.iss` |
 | Telegram-импорт задач | `TelegramTaskService.cs`, `TelegramTaskParser.cs` |
 | Context builder (WinForms) | `ContextBuilderDialog.cs` |

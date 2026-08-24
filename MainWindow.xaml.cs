@@ -38,7 +38,6 @@ public partial class MainWindow : Window
     private readonly JsonFileStore<NotesStoreData> _notesStore = new(AppPaths.NotesJson);
     private readonly JsonFileStore<ConnectionsStoreData> _connectionsStore = new(AppPaths.ConnectionsJson);
     private readonly JsonFileStore<AppSettingsData> _settingsStore = new(AppPaths.SettingsJson);
-    private readonly JsonFileStore<AiAgentsStoreData> _aiAgentsStore = new(AppPaths.AiAgentsJson);
     private readonly JsonFileStore<TasksStoreData> _tasksStore = new(AppPaths.TasksJson);
     private readonly JsonFileStore<ActivityStoreData> _activityStore = new(AppPaths.ActivityJson);
     private readonly JsonFileStore<ProjectTemplatesStoreData> _templatesStore = new(AppPaths.ProjectTemplatesJson);
@@ -47,25 +46,18 @@ public partial class MainWindow : Window
     private NotesStoreData _notes = new();
     private ConnectionsStoreData _connections = new();
     private AppSettingsData _settings = new();
-    private AiAgentsStoreData _aiAgents = new();
     private TasksStoreData _tasks = new();
     private ActivityStoreData _activity = new();
     private ProjectTemplatesStoreData _templates = new();
     private ProjectProfile? _selectedProject;
     private ProjectProfile? _focusProject;
     private DateTime? _focusStartedAt;
-    private readonly List<string> _droppedFiles = [];
     private readonly Dictionary<string, ViewDisplayMode> _viewModes = new();
-    private string _viewScope = "home";
+    private string _viewScope = "projects";
     private string _projectDetailTab = "notes";
-    private bool _projectTasksArchive;
-    private string _browserCategoryFilter = "AI Agents";
     private readonly Dictionary<string, WpfButton> _sideNavButtons = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, WpfButton> _topNavButtons = new(StringComparer.OrdinalIgnoreCase);
-    private string? _activeSideNavKey = "home";
-    private string? _activeTopNavKey;
+    private string? _activeSideNavKey = "projects";
     private string _connectionTypeFilter = "Все";
-    private bool _showTaskArchive;
     private readonly Stack<string> _backStack = new();
     private readonly Stack<string> _forwardStack = new();
     private readonly List<string> _openTabs = [];
@@ -106,10 +98,9 @@ public partial class MainWindow : Window
             UpdateActiveTaskPill();
         };
         TaskNotificationService.NotificationActivated += OnTaskNotificationActivated;
-        ShowHome();
+        ShowProjects();
         InitializeNowPlaying();
         InitializeTelegramPolling();
-        InitializePortal();
         AddLog("OK", "WideS запущен.");
     }
 
@@ -195,9 +186,7 @@ public partial class MainWindow : Window
             _mediaService,
             () => AddTask(forceCommon: true),
             () => AddNote(forceCommon: true),
-            () => { ShowFromTray(); ShowDropZone(); },
-            ShowFromTray,
-            ImportFilesToDropZone);
+            ShowFromTray);
 
         RefreshDockConnections();
 
@@ -216,8 +205,7 @@ public partial class MainWindow : Window
     {
         if (_dockWindow is null) return;
         var connections = _connections.Connections
-            .OrderByDescending(c => c.IsPinned)
-            .ThenByDescending(c => c.CreatedAt)
+            .OrderByDescending(c => c.CreatedAt)
             .ToList();
         _dockWindow.SetConnections(connections, Connect, ShowConnectionPassword);
     }
@@ -329,7 +317,6 @@ public partial class MainWindow : Window
         _tasksStore.Save(_tasks);
         AddLog("OK", $"Telegram: добавлено задач {added}.");
         if (_currentViewKey == "tasks") ShowTasks();
-        else if (_currentViewKey == "home") ShowHome();
         return added;
     }
 
@@ -353,11 +340,9 @@ public partial class MainWindow : Window
         _notes = _notesStore.Load();
         _connections = _connectionsStore.Load();
         _settings = _settingsStore.Load();
-        _aiAgents = _aiAgentsStore.Load();
         _tasks = _tasksStore.Load();
         _activity = _activityStore.Load();
         _templates = _templatesStore.Load();
-        EnsureAiAgentDefaults();
         EnsureProjectTemplateDefaults();
         MigrateCreatedAtDefaults();
         _selectedProject = _projects.Projects.FirstOrDefault();
@@ -393,33 +378,25 @@ public partial class MainWindow : Window
             item.CreatedAt = DateTime.Now;
             migrated = true;
         }
-        foreach (var item in _aiAgents.Agents.Where(a => a.CreatedAt.Year < 2000))
-        {
-            item.CreatedAt = DateTime.Now;
-            migrated = true;
-        }
         if (migrated)
         {
             _projectStore.Save(_projects);
             _notesStore.Save(_notes);
             _connectionsStore.Save(_connections);
             _tasksStore.Save(_tasks);
-            _aiAgentsStore.Save(_aiAgents);
         }
     }
 
     private static string NavIconKey(string key) => key switch
     {
-        "home" => "nav-home",
         "projects" => "nav-projects",
         "tasks" => "nav-tasks",
         "notes" => "nav-notes",
         "connections" => "nav-connections",
-        "ai" => "nav-browser",
-        "dropzone" => "nav-dropzone",
+        "messengers" => "nav-messengers",
+        "music" => "music",
         "settings" => "nav-settings",
-        "favorites" => "star",
-        _ => "nav-home"
+        _ => "nav-projects"
     };
 
     private void AddNav(string text, string key, Action action)
@@ -444,57 +421,29 @@ public partial class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(button, text);
         button.Click += (_, _) =>
         {
-            _activeTopNavKey = null;
             action();
         };
         _sideNavButtons[key] = button;
         NavPanel.Children.Add(button);
     }
 
-    private void AddTopNav(string text, string key, Action action)
-    {
-        var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
-        content.Children.Add(MakeIcon(NavIconKey(key), 14));
-        content.Children.Add(new TextBlock
-        {
-            Text = text,
-            Margin = new Thickness(7, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        });
-        var button = new WpfButton
-        {
-            Content = content,
-            Tag = key,
-            Style = RequireStyle("TopNavPill")
-        };
-        System.Windows.Automation.AutomationProperties.SetName(button, text);
-        button.Click += (_, _) => action();
-        _topNavButtons[key] = button;
-        TopNavPanel.Children.Add(button);
-    }
-
     private void UpdateNavHighlight(string? viewKey = null)
     {
-        var key = viewKey ?? _currentViewKey ?? "home";
+        var key = viewKey ?? _currentViewKey ?? "projects";
         string? sideKey = key switch
         {
-            "home"        => "home",
             "projects"    => "projects",
-            "ai"          => "ai",
+            "notes"       => "notes",
+            "connections" => "connections",
+            "tasks"       => "tasks",
+            "messengers"  => "messengers",
+            "music"       => "music",
             "settings"    => "settings",
             _ => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase) ? "projects" : null
         };
-        var topKey = key is "notes" or "connections" or "tasks" or "dropzone" or "favorites" ? key : null;
-
         if (sideKey is not null)
         {
             _activeSideNavKey = sideKey;
-            _activeTopNavKey = null;
-        }
-        else if (topKey is not null)
-        {
-            _activeSideNavKey = null;
-            _activeTopNavKey = topKey;
         }
 
         foreach (var (navKey, button) in _sideNavButtons)
@@ -504,12 +453,6 @@ public partial class MainWindow : Window
                 : "NavButton");
         }
 
-        foreach (var (navKey, button) in _topNavButtons)
-        {
-            button.Style = RequireStyle(navKey.Equals(_activeTopNavKey, StringComparison.OrdinalIgnoreCase)
-                ? "TopNavPillActive"
-                : "TopNavPill");
-        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -567,7 +510,7 @@ public partial class MainWindow : Window
         _hwndSource?.RemoveHook(WndProc);
         _dockWindow?.Close();
         _trayIcon?.Dispose();
-        ShutdownPortalService();
+        DisposeWebApps();
         base.OnClosing(e);
     }
 
@@ -744,10 +687,17 @@ public partial class MainWindow : Window
         }
         RenderTabs();
         UpdateNavHighlight(key);
+        UpdateNavigationButtons();
     }
 
     private void Back_Click(object sender, RoutedEventArgs e)
     {
+        if (CurrentWebNavigation?.CanGoBack == true)
+        {
+            CurrentWebNavigation.GoBack();
+            return;
+        }
+
         if (_backStack.Count == 0 || _currentViewKey is null) return;
         _forwardStack.Push(_currentViewKey);
         ActivateView(_backStack.Pop(), true);
@@ -755,6 +705,12 @@ public partial class MainWindow : Window
 
     private void Forward_Click(object sender, RoutedEventArgs e)
     {
+        if (CurrentWebNavigation?.CanGoForward == true)
+        {
+            CurrentWebNavigation.GoForward();
+            return;
+        }
+
         if (_forwardStack.Count == 0 || _currentViewKey is null) return;
         _backStack.Push(_currentViewKey);
         ActivateView(_forwardStack.Pop(), true);
@@ -778,17 +734,15 @@ public partial class MainWindow : Window
 
             switch (key)
             {
-                case "home": ShowHome(); break;
                 case "notes": ShowNotes(); break;
                 case "connections": ShowConnections(); break;
                 case "projects": ShowProjects(); break;
-                case "favorites": ShowFavorites(); break;
                 case "tasks": ShowTasks(); break;
-                case "ai": ShowAiAgents(); break;
+                case "messengers": ShowMessengers(); break;
+                case "music": ShowMusic(); break;
                 case "history": ShowHistory(); break;
-                case "dropzone": ShowDropZone(); break;
                 case "settings": ShowSettings(); break;
-                default: ShowHome(); break;
+                default: ShowProjects(); break;
             }
         }
         finally
@@ -870,15 +824,11 @@ public partial class MainWindow : Window
 
         return key switch
         {
-            "home" => "Главная",
             "notes" => "Заметки",
             "connections" => "Подключения",
             "projects" => "Проекты",
-            "favorites" => "Избранное",
             "tasks" => "Задачи",
-            "ai" => "Браузер",
             "history" => "История",
-            "dropzone" => "DropZone",
             "settings" => "Настройки",
             _ => key
         };
@@ -932,8 +882,7 @@ public partial class MainWindow : Window
         {
             Name = "Стандартный проект WideS",
             Folders = ["Docs", "Source", "Tests", "Releases", "_Inbox"],
-            NoteTitles = ["README проекта", "Контекст проекта", "Решения и договоренности"],
-            TaskTitles = ["Проверить структуру проекта", "Подготовить context.txt"]
+            NoteTitles = ["README проекта", "Контекст проекта", "Решения и договоренности"]
         });
         _templatesStore.Save(_templates);
     }
@@ -947,69 +896,14 @@ public partial class MainWindow : Window
 
 
 
-    private void ToggleNotePinned(NoteItem note)
-    {
-        note.IsPinned = !note.IsPinned;
-        _notesStore.Save(_notes);
-        AddLog("OK", note.IsPinned ? $"Заметка добавлена в избранное: {note.Title}" : $"Заметка убрана из избранного: {note.Title}");
-        RefreshAfterPinnedChange();
-    }
+ 
 
-    private void ToggleConnectionPinned(ConnectionItem connection)
-    {
-        connection.IsPinned = !connection.IsPinned;
-        _connectionsStore.Save(_connections);
-        AddLog("OK", connection.IsPinned ? $"Подключение добавлено в избранное: {connection.Name}" : $"Подключение убрано из избранного: {connection.Name}");
-        RefreshAfterPinnedChange();
-    }
-
-    private void ToggleTaskPinned(TaskItem task)
-    {
-        task.IsPinned = !task.IsPinned;
-        _tasksStore.Save(_tasks);
-        AddLog("OK", task.IsPinned ? $"Задача добавлена в избранное: {task.Title}" : $"Задача убрана из избранного: {task.Title}");
-        RefreshAfterPinnedChange();
-    }
-
-    private void ToggleAiAgentPinned(AiAgentItem agent)
-    {
-        agent.IsPinned = !agent.IsPinned;
-        _aiAgentsStore.Save(_aiAgents);
-        AddLog("OK", agent.IsPinned ? $"Ссылка добавлена в избранное: {agent.Name}" : $"Ссылка убрана из избранного: {agent.Name}");
-        RefreshAfterPinnedChange();
-    }
-
-    private void RefreshAfterPinnedChange()
-    {
-        if (_viewScope == "favorites")
-        {
-            ShowFavorites();
-            return;
-        }
-
-        ActivateView(_currentViewKey ?? _viewScope, true);
-    }
+ 
 
 
 
 
-    private int PinnedCount()
-        => _projects.Projects.Count(p => p.IsPinned)
-         + _notes.Notes.Count(n => n.IsPinned)
-         + _connections.Connections.Count(c => c.IsPinned)
-         + _tasks.Tasks.Count(t => t.IsPinned)
-         + _aiAgents.Agents.Count(a => a.IsPinned);
-
-    private string PinnedText()
-    {
-        var items = new List<string>();
-        items.AddRange(_projects.Projects.Where(p => p.IsPinned).Take(5).Select(p => "Проект: " + p.Name));
-        items.AddRange(_tasks.Tasks.Where(t => t.IsPinned && !t.IsDone).Take(5).Select(t => "Задача: " + t.Title));
-        items.AddRange(_notes.Notes.Where(n => n.IsPinned).Take(5).Select(n => "Заметка: " + n.Title));
-        items.AddRange(_connections.Connections.Where(c => c.IsPinned).Take(5).Select(c => "Подключение: " + c.Name));
-        items.AddRange(_aiAgents.Agents.Where(a => a.IsPinned).Take(5).Select(a => "Ссылка: " + a.Name));
-        return items.Count == 0 ? "Пока ничего не закреплено." : string.Join("\n", items);
-    }
+ 
 
 
 
@@ -1020,7 +914,6 @@ public partial class MainWindow : Window
     private void AddNote_Click(object sender, RoutedEventArgs e) => AddNote();
     private void AddConnection_Click(object sender, RoutedEventArgs e) => AddConnection();
     private void OpenFolder_Click(object sender, RoutedEventArgs e) => OpenSelectedFolder();
-    private void DropZone_Click(object sender, RoutedEventArgs e) => ShowDropZone();
 
 
 
@@ -1116,15 +1009,6 @@ public partial class MainWindow : Window
                 new GlobalSearchWindow.SearchHit("Подключение", connection.Name, $"{connection.Type}: {connection.Address}", () => Connect(connection))));
         }
 
-        foreach (var link in _aiAgents.Agents.Where(x =>
-                     x.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                     x.Url.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                     x.Category.Contains(query, StringComparison.OrdinalIgnoreCase)))
-        {
-            hits.Add((link.CreatedAt,
-                new GlobalSearchWindow.SearchHit("Ссылка", link.Name, link.Url, () => OpenUrl(link.Url, link.Name))));
-        }
-
         return hits.OrderByDescending(x => x.SortAt).Select(x => x.Hit).Take(20).ToList();
     }
 
@@ -1203,7 +1087,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        ShowHome();
+        ShowProjects();
     }
 
     private Border Card(string title)
@@ -1480,9 +1364,6 @@ public partial class MainWindow : Window
     }
 
 
-    private static bool IsTaskInProgress(TaskItem task) =>
-        IsTaskRunning(task);
-
     private ProjectProfile? GetCreationContextProject(bool forceCommon)
     {
         if (!forceCommon && _selectedProject is not null &&
@@ -1509,7 +1390,7 @@ public partial class MainWindow : Window
 
     private void HandleTaskNotificationAction(TaskNotificationAction action)
     {
-        if (action.Action is "portal" or "activate")
+        if (action.Action == "activate")
         {
             ShowFromTray();
             return;
@@ -1692,17 +1573,6 @@ public partial class MainWindow : Window
         };
         System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
         button.Click += (_, _) => action();
-        return button;
-    }
-
-    private WpfButton FavoriteIconButton(bool isPinned, Action action, double rightOffset = 0)
-    {
-        var button = IconButton("star", action, isPinned ? "Убрать из избранного" : "Добавить в избранное", 28);
-        button.Background = isPinned ? (WpfBrush)FindResource("FocusWarnBgBrush") : (WpfBrush)FindResource("PanelBrush");
-        button.BorderBrush = isPinned ? (WpfBrush)FindResource("WarnBrush") : (WpfBrush)FindResource("BorderMainBrush");
-        button.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
-        button.VerticalAlignment = VerticalAlignment.Top;
-        button.Margin = new Thickness(0, 0, rightOffset, 0);
         return button;
     }
 
