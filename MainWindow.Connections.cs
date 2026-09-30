@@ -38,17 +38,23 @@ public partial class MainWindow
                                      c.Address.Contains(query, StringComparison.OrdinalIgnoreCase))
                          .OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase)
                          .ToList();
-            if (items.Count > 0)
+            if (items.Count == 0)
+            {
+                list.Children.Add(UiHelpers.EmptyState("Подключений нет", "Добавьте первое подключение.", "Новое подключение", () => AddConnection()));
+                return;
+            }
+
+            if (IsRaycastUi)
+            {
+                foreach (var item in items)
+                    list.Children.Add(ConnectionRaycastRow(item));
+            }
+            else
             {
                 list.Children.Add(ConnectionTableHeader());
+                foreach (var item in items)
+                    list.Children.Add(ConnectionCompactRow(item));
             }
-
-            foreach (var item in items)
-            {
-                list.Children.Add(ConnectionCompactRow(item));
-            }
-
-            if (list.Children.Count == 0) list.Children.Add(UiHelpers.EmptyState("Подключений нет", "Добавьте первое подключение.", "Новое подключение", () => AddConnection()));
         }
         search = SearchBox("Поиск подключения", Render);
         top.Children.Add(search);
@@ -76,6 +82,7 @@ public partial class MainWindow
             ? new ConnectionItem { WorkspaceId = _selectedProject.Id }
             : null;
         var win = new ConnectionEditorWindow(_projects.Projects, source) { Owner = this };
+        EditorWindowHelper.Register(win.Connection.Id, win);
         win.Closed += (_, _) =>
         {
             if (!win.Saved) return;
@@ -84,12 +91,14 @@ public partial class MainWindow
             AddLog("OK", $"Подключение добавлено: {win.Connection.Name}");
             RefreshAfterConnectionChange(win.Connection);
         };
-        WindowPlacementService.PlaceOnPrimary(win);
-        win.Show();
+        EditorWindowHelper.ShowNearOwner(win);
     }
     private void EditConnection(ConnectionItem item)
     {
+        if (EditorWindowHelper.TryActivate(item.Id)) return;
+
         var win = new ConnectionEditorWindow(_projects.Projects, item) { Owner = this };
+        EditorWindowHelper.Register(item.Id, win);
         win.Closed += (_, _) =>
         {
             if (!win.Saved) return;
@@ -99,8 +108,7 @@ public partial class MainWindow
             AddLog("OK", $"Подключение изменено: {win.Connection.Name}");
             RefreshAfterConnectionChange(win.Connection);
         };
-        WindowPlacementService.PlaceOnPrimary(win);
-        win.Show();
+        EditorWindowHelper.ShowNearOwner(win);
     }
     private void RefreshAfterConnectionChange(ConnectionItem connection)
     {
@@ -141,6 +149,64 @@ public partial class MainWindow
         ("Тип", new GridLength(72)),
         ("ID / адрес", new GridLength(140)),
         ("Действия", GridLength.Auto));
+
+    private Border ConnectionRaycastRow(ConnectionItem item)
+    {
+        var row = new Border
+        {
+            Background = (WpfBrush)FindResource("CardBrush"),
+            BorderBrush = (WpfBrush)FindResource("BorderSubtleBrush"),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 12, 10, 12),
+            Margin = new Thickness(0, 0, 0, 8),
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var left = new StackPanel();
+        left.Children.Add(new TextBlock
+        {
+            Text = item.Name,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (WpfBrush)FindResource("TextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        left.Children.Add(new TextBlock
+        {
+            Text = $"{item.Type}  ·  {item.Address}",
+            FontSize = 11,
+            Foreground = (WpfBrush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 4, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(left, 0);
+        grid.Children.Add(left);
+
+        var actions = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        actions.Children.Add(CompactActionButton("Подключиться", () => Connect(item)));
+        actions.Children.Add(RowOverflowButton(
+            ("Изменить", () => EditConnection(item))));
+        Grid.SetColumn(actions, 1);
+        grid.Children.Add(actions);
+
+        row.Child = grid;
+        row.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!IsInsideButton(e.OriginalSource as DependencyObject))
+                Connect(item);
+        };
+        return row;
+    }
 
     private Border ConnectionCompactRow(ConnectionItem item)
     {
@@ -193,10 +259,10 @@ public partial class MainWindow
             Orientation = System.Windows.Controls.Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var connect = ActionButton("Подк.", () => Connect(item));
+        var connect = ActionButton("Подключиться", () => Connect(item));
         connect.Height = 28;
-        connect.MinWidth = 54;
-        connect.Padding = new Thickness(8, 2, 8, 2);
+        connect.MinWidth = 0;
+        connect.Padding = new Thickness(10, 2, 10, 2);
         connect.Margin = new Thickness(0, 0, 2, 0);
         actions.Children.Add(connect);
 

@@ -39,12 +39,11 @@ if (Test-Path $dataDir) {
     Write-Host "Removed bundled data folder (user data is created on first run)."
 }
 
-$exePath = Join-Path $appDir "WideS.exe"
 $sizeMb = [math]::Round((Get-ChildItem $appDir -Recurse -File | Measure-Object Length -Sum).Sum / 1MB, 1)
-Write-Host ("Portable app ready: {0} ({1} MB, .NET runtime included)" -f $appDir, $sizeMb)
+Write-Host "App staged: $appDir ($sizeMb MB, .NET runtime included)"
 
 if ($SkipInno) {
-    Write-Host "SkipInno specified. Run WideS-Setup\WideS-Setup.bat for manual install."
+    Write-Host "SkipInno specified - installer was not built."
     exit 0
 }
 
@@ -66,23 +65,22 @@ if (-not $iscc) {
 }
 
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
 $portableZip = Join-Path $outputDir "WideS-Setup-portable.zip"
-if (Test-Path $portableZip) { Remove-Item $portableZip -Force }
-Compress-Archive -Path (Join-Path $PSScriptRoot "WideS-Setup\*") -DestinationPath $portableZip -Force
-Write-Host "Portable zip: $portableZip"
+if (Test-Path $portableZip) {
+    Remove-Item $portableZip -Force
+    Write-Host "Removed obsolete portable zip."
+}
 
 if (-not $iscc) {
-    Write-Host ""
-    Write-Host "Inno Setup 6 not found."
-    Write-Host "Install: https://jrsoftware.org/isdl.php"
-    Write-Host "Then run: setup\build-setup.bat"
-    Write-Host ""
-    Write-Host "Distribute WideS-Setup-portable.zip - user unzips and runs WideS-Setup.bat"
-    exit 0
+    throw "Inno Setup 6 not found. Install: https://jrsoftware.org/isdl.php"
 }
 
 Write-Host "Building installer with Inno Setup..."
 & $iscc (Join-Path $PSScriptRoot "WideS.iss")
+if ($LASTEXITCODE -ne 0) {
+    throw "ISCC failed with exit code $LASTEXITCODE"
+}
 
 $setupExe = Join-Path $outputDir "WideS-Setup.exe"
 if (-not (Test-Path $setupExe)) {
@@ -90,4 +88,5 @@ if (-not (Test-Path $setupExe)) {
 }
 
 $setupSizeMb = [math]::Round((Get-Item $setupExe).Length / 1MB, 1)
-Write-Host ("Done: {0} ({1} MB)" -f $setupExe, $setupSizeMb)
+Write-Host "Done: $setupExe ($setupSizeMb MB)"
+Write-Host "Run this setup on the work PC over the existing install. Data in AppData\WideS is kept."

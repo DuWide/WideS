@@ -66,7 +66,7 @@ public static class ConnectionService
         {
             if (!string.IsNullOrWhiteSpace(password))
             {
-                WpfClipboard.SetText(password);
+                ClipboardSecretService.CopySecret(password);
             }
 
             throw new InvalidOperationException($"RDP не удалось: {ex.Message}. Пароль скопирован в буфер.", ex);
@@ -116,7 +116,14 @@ public static class ConnectionService
     {
         var anyDesk = ResolveAnyDesk(settings.AnyDeskPath);
         var password = SecretService.Unprotect(connection.EncryptedPassword);
-        WpfClipboard.SetText(string.IsNullOrWhiteSpace(password) ? connection.Address : password);
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            WpfClipboard.SetText(connection.Address);
+        }
+        else
+        {
+            ClipboardSecretService.CopySecret(password);
+        }
 
         if (string.IsNullOrWhiteSpace(anyDesk))
         {

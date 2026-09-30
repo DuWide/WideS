@@ -11,6 +11,9 @@ namespace DevCockpit;
 public sealed class MediaService
 {
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
+    // Обложка не меняется в рамках трека: не читаем и не копируем её заново при каждом опросе.
+    private string? _artKey;
+    private byte[]? _artBytes;
 
     public sealed record Snapshot(bool HasSession, string Title, string Artist, bool IsPlaying, string Source, byte[]? AlbumArt);
 
@@ -51,7 +54,19 @@ public sealed class MediaService
             }
 
             var source = FriendlySource(session.SourceAppUserModelId);
-            var albumArt = await ReadThumbnailAsync(props?.Thumbnail);
+            var artKey = $"{session.SourceAppUserModelId}\n{props?.Title}\n{props?.Artist}\n{props?.AlbumTitle}";
+            byte[]? albumArt;
+            if (artKey == _artKey && _artBytes is not null)
+            {
+                albumArt = _artBytes;
+            }
+            else
+            {
+                albumArt = await ReadThumbnailAsync(props?.Thumbnail);
+                _artKey = artKey;
+                _artBytes = albumArt;
+            }
+
             return new Snapshot(!string.IsNullOrWhiteSpace(title), title, artist, isPlaying, source, albumArt);
         }
         catch

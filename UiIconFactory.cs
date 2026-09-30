@@ -17,6 +17,7 @@ public static class UiIconFactory
     {
         ["close"] = new("M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5"),
         ["minus"] = new("M5 12 H19"),
+        ["plus"] = new("M5 12 H19 M12 5 V19"),
         ["maximize"] = new("M5.2 5.2 H18.8 V18.8 H5.2 Z"),
         ["restore"] = new("M8.4 8.4 H18.8 V18.8 H8.4 Z M5.2 15.6 V5.2 H15.6"),
         ["back"] = new("M14.8 5.4 L8 12 L14.8 18.6"),
@@ -53,21 +54,46 @@ public static class UiIconFactory
         ["nav-connections"] = new("M3.6 5.2 H20.4 V15.8 H3.6 Z M9.2 19.6 H14.8 M12 15.8 V19.6"),
         ["nav-tasks"] = new("M4.2 7.2 L6.2 9.2 L9.6 5.6 M4.2 16.4 L6.2 18.4 L9.6 14.8 M12.4 7.2 H19.8 M12.4 16.4 H19.8"),
         ["nav-messengers"] = new("M4 5.6 H20 V16 H12.4 L8 19.6 V16 H4 Z"),
+        ["nav-tiktok"] = new(
+            "M14.2 3.6 V13.2 A4.4 4.4 0 1 1 9.8 8.8 " +
+            "M14.2 3.6 C15.1 5.4 16.7 6.6 18.6 6.9 V10.2 C16.6 10 14.9 9.1 14.2 7.8"),
         ["nav-settings"] = new(
             "M3.8 8 H20.2 M3.8 16 H20.2 " +
             "M7.6 8 A2.3 2.3 0 1 0 12.2 8 A2.3 2.3 0 1 0 7.6 8 " +
             "M11.8 16 A2.3 2.3 0 1 0 16.4 16 A2.3 2.3 0 1 0 11.8 16"),
+        ["nav-manga"] = new("M12 6.4 C10.1 5 7.6 4.5 4.2 4.7 V18.3 C7.6 18.1 10.1 18.6 12 20 C13.9 18.6 16.4 18.1 19.8 18.3 V4.7 C16.4 4.5 13.9 5 12 6.4 Z M12 6.4 V20"),
+        ["fullscreen"] = new("M4.5 9 V4.5 H9 M15 4.5 H19.5 V9 M19.5 15 V19.5 H15 M9 19.5 H4.5 V15"),
+        ["fullscreen-exit"] = new("M9 4.5 V9 H4.5 M19.5 9 H15 V4.5 M15 19.5 V15 H19.5 M4.5 15 H9 V19.5"),
 
-        ["dock"] = new("M3.6 5.4 H20.4 V18.6 H3.6 Z M3.6 14.2 H20.4 M8.4 16.4 H15.6"),
+        // Док: панель с тремя «приложениями» внизу и окно над ней — не путается с «монитором».
+        ["dock"] = new("M3.8 15 H20.2 V19.8 H3.8 Z M7.4 17.4 H7.9 M11.75 17.4 H12.25 M16.1 17.4 H16.6 M7.6 4.4 H16.4 V11.4 H7.6 Z"),
+        // Журнал: часы со стрелкой назад (история), не путается с «Заметками».
+        ["journal"] = new("M4.35 12 A7.65 7.65 0 1 0 12 4.35 A8.3 8.3 0 0 0 6.27 6.68 L4.35 8.6 M4.35 4.35 V8.6 H8.6 M12 7.75 V12 L15.4 13.7"),
         ["open"] = new("M13.8 4.4 H19.6 V10.2 M19.6 4.4 L11.4 12.6 M17.6 14.2 V19.6 H4.4 V6.4 H9.8")
     };
+
+    // Разобранные и замороженные геометрии: иконки пересоздаются часто (мини-плеер, навигация),
+    // а Geometry.Parse на каждый вызов — лишняя работа и выделения памяти на UI-потоке.
+    private static readonly Dictionary<string, Geometry> GeometryCache = new(StringComparer.Ordinal);
+
+    private static Geometry GetGeometry(string data)
+    {
+        if (!GeometryCache.TryGetValue(data, out var geometry))
+        {
+            geometry = Geometry.Parse(data);
+            geometry.Freeze();
+            GeometryCache[data] = geometry;
+        }
+
+        return geometry;
+    }
 
     public static FrameworkElement Create(string iconName, double size)
     {
         var shape = Resolve(iconName);
         var path = new WpfPath
         {
-            Data = Geometry.Parse(shape.Data),
+            Data = GetGeometry(shape.Data),
             Width = Canvas,
             Height = Canvas,
             Stretch = Stretch.None,
@@ -111,6 +137,8 @@ public static class UiIconFactory
             "settings" => "nav-settings",
             "projects" => "nav-projects",
             "messengers" => "nav-messengers",
+            "tiktok" => "nav-tiktok",
+            "manga" => "nav-manga",
             _ => "nav-projects"
         };
 

@@ -44,9 +44,7 @@ public partial class TaskEditorWindow : Window
         TitleBox.Text = Task.Title;
         DescriptionBox.Text = Task.Description;
         InitDateTimeControls(Task.StartAt, StartDatePicker, StartHourBox, StartMinuteBox);
-
         SelectImportance(Task.Importance);
-        EditorWindowHelper.HookConfirmClose(this, () => !Saved && IsDirty(), () => TrySave(showValidationErrors: true));
     }
 
     private bool IsDirty()
@@ -141,16 +139,10 @@ public partial class TaskEditorWindow : Window
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => EditorWindowHelper.MinimizeWindow(this);
 
-    private void Cancel_Click(object sender, RoutedEventArgs e)
-    {
-        if (EditorWindowHelper.ConfirmClose(this, !Saved && IsDirty(), () => TrySave(showValidationErrors: true)))
-        {
-            Close();
-        }
-    }
+    private void Cancel_Click(object sender, RoutedEventArgs e) => Close();
 
     private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e) =>
         EditorWindowHelper.TitleBar_MouseLeftButtonDown(this, e);
 
-    private void Close_Click(object sender, RoutedEventArgs e) => Cancel_Click(sender, e);
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

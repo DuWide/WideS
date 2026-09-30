@@ -70,7 +70,7 @@ public partial class MainWindow
                     return;
                 }
 
-                _settings.LoginPasswordEncrypted = SecretService.Protect(loginPassword.Password);
+                SecretService.SetLoginPassword(_settings, loginPassword.Password);
                 loginPassword.Clear();
                 confirmPassword.Clear();
             }
@@ -114,7 +114,7 @@ public partial class MainWindow
         var appearance = Card("Внешний вид");
         appearance.Width = 720;
         var appearanceStack = BaseCardStack("Внешний вид");
-        appearanceStack.Children.Add(Muted("Тема интерфейса"));
+        appearanceStack.Children.Add(Muted("Тема интерфейса (Raycast — отдельный визуал со стеклом и красным glow; «Тёмная» возвращает старый вид)"));
         var accentBox = UiHelpers.CreateToolbarComboBox(320);
         foreach (var preset in ThemeService.Presets) accentBox.Items.Add(preset);
         accentBox.SelectedItem = ThemeService.GetPreset(_settings.AccentTheme);
@@ -142,14 +142,32 @@ public partial class MainWindow
             if (modeBox.SelectedItem is SelectOption option) modeHint.Text = WorkModeService.DescribeEffects(option.Value);
         };
         appearanceStack.Children.Add(modeHint);
+        appearanceStack.Children.Add(Muted("Производительность (для слабых ноутбуков и RDP)"));
+        var performanceBox = UiHelpers.CreateToolbarComboBox(320);
+        foreach (var option in PerformanceProfile.ModeOptions())
+        {
+            performanceBox.Items.Add(new SelectOption(option.Label, option.Value));
+        }
+        var currentPerformance = PerformanceProfile.Normalize(_settings.PerformanceMode);
+        performanceBox.SelectedItem = performanceBox.Items.OfType<SelectOption>().FirstOrDefault(x => x.Value == currentPerformance) ?? performanceBox.Items[0];
+        appearanceStack.Children.Add(performanceBox);
+        var performanceHint = Muted(PerformanceProfile.Describe(currentPerformance));
+        performanceBox.SelectionChanged += (_, _) =>
+        {
+            if (performanceBox.SelectedItem is SelectOption option) performanceHint.Text = PerformanceProfile.Describe(option.Value);
+        };
+        appearanceStack.Children.Add(performanceHint);
         appearanceStack.Children.Add(ActionButton("Применить оформление", () =>
         {
             _settings.AccentTheme = (accentBox.SelectedItem as ThemeService.ThemePreset)?.Id ?? "Dark";
             _settings.WorkMode = (modeBox.SelectedItem as SelectOption)?.Value ?? "Work";
             _settings.CompactSidebar = compactSidebarCheck.IsChecked == true;
+            _settings.PerformanceMode = (performanceBox.SelectedItem as SelectOption)?.Value ?? PerformanceProfile.Auto;
             _settingsStore.Save(_settings);
+            PerformanceProfile.Apply(_settings.PerformanceMode);
+            _dockWindow?.ApplyPerformanceProfile();
             ApplyTheme(_settings.AccentTheme);
-            ApplyCompactSidebar(_settings.CompactSidebar);
+            UpdateResponsiveSidebar();
             _ = UpdateNowPlaying();
             AddLog("OK", "Настройки вида сохранены.");
             RefreshCurrentView();

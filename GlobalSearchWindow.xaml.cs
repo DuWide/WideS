@@ -20,7 +20,53 @@ public partial class GlobalSearchWindow : Window
             SearchBox.Focus();
             SearchBox.SelectAll();
         };
+        // Закрытие при потере фокуса — отложенно и только один раз: иначе Close() во время закрытия
+        // (Esc/Enter → окно закрывается → теряет активность → Deactivated → Close()) бросал
+        // InvalidOperationException «Во время закрытия окна нельзя … вызвать Close».
+        Deactivated += (_, _) => Dispatcher.BeginInvoke(new Action(SafeClose), System.Windows.Threading.DispatcherPriority.Background);
     }
+
+    private bool _closing;
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (!e.Cancel)
+        {
+            _closing = true;
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closing = true;
+        base.OnClosed(e);
+    }
+
+    private void SafeClose()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        _closing = true;
+        Close();
+    }
+
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            SafeClose();
+            e.Handled = true;
+            return;
+        }
+
+        base.OnPreviewKeyDown(e);
+    }
+
+    private void CloseSearch_Click(object sender, RoutedEventArgs e) => SafeClose();
 
     private void RenderResults()
     {
@@ -62,7 +108,7 @@ public partial class GlobalSearchWindow : Window
             return;
         }
 
-        Close();
+        SafeClose();
         hit.Open();
     }
 
@@ -90,7 +136,7 @@ public partial class GlobalSearchWindow : Window
         }
         else if (e.Key == Key.Escape)
         {
-            Close();
+            SafeClose();
             e.Handled = true;
         }
     }

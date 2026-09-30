@@ -68,7 +68,11 @@ public sealed class AppSettingsData
 {
     public string AnyDeskPath { get; set; } = "";
     public string UserName { get; set; } = "Олег";
+    /// <summary>Устаревшее: пароль входа, зашифрованный DPAPI. Переводится в LoginPasswordHash при входе.</summary>
     public string LoginPasswordEncrypted { get; set; } = "";
+
+    /// <summary>Хэш пароля входа (PBKDF2-SHA256 с солью), см. SecretService.HashPassword.</summary>
+    public string LoginPasswordHash { get; set; } = "";
     public bool DisableLogin { get; set; }
     public bool IsFirstRunConfigured { get; set; }
     public string DockPosition { get; set; } = "Center";
@@ -84,6 +88,21 @@ public sealed class AppSettingsData
     public long TelegramLastUpdateId { get; set; }
     public long TelegramBotId { get; set; } = 778912409;
     public bool ToastNotificationsEnabled { get; set; } = true;
+
+    /// <summary>Масштаб встроенных веб-страниц в процентах. 0 — подобрать по масштабу Windows.</summary>
+    public int WebAppZoomPercent { get; set; }
+
+    /// <summary>Режим производительности: Auto, Quality или Economy (см. PerformanceProfile).</summary>
+    public string PerformanceMode { get; set; } = "Auto";
+
+    /// <summary>Последняя открытая страница MangaLib (продолжить чтение с того же места).</summary>
+    public string MangaLibLastUrl { get; set; } = "";
+
+    /// <summary>Масштаб читалки MangaLib отдельно от остальных веб-приложений. 0 — по масштабу Windows.</summary>
+    public int MangaLibZoomPercent { get; set; }
+
+    /// <summary>Положение главного окна (обычный прямоугольник в пикселях, монитор, развернуто ли).</summary>
+    public string MainWindowPlacement { get; set; } = "";
 }
 
 public sealed record SelectOption(string Label, string Value)

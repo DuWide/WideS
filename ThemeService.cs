@@ -46,6 +46,12 @@ public static class ThemeService
             accentSoft: "#202923", accentBorder: "#3A5040", text: "#F1F1F1", muted: "#B2B2B2", subtle: "#7F7F7F", icon: "#E6E6E6",
             border: "#353535", borderSubtle: "#272727", success: "#6F9878", warning: "#C49A61", danger: "#C76E6E",
             info: "#A5AAA6", purple: "#9B91AE", log: "#101010", scroll: "#454545", scrollHover: "#626262")),
+        new("Raycast", "Raycast (стекло + UX)", Palette(
+            appBg: "#121212", sidebar: "#E0141414", panel: "#CC1A1A1A", card: "#B81F1F1F", cardHover: "#CC262626",
+            input: "#1FFFFFFF", elevated: "#28FFFFFF", accent: "#E11D2E", accentHover: "#F23444", accentPressed: "#B81624",
+            accentSoft: "#38E11D2E", accentBorder: "#55E11D2E", text: "#F5F5F5", muted: "#B0B0B0", subtle: "#8A8A8A", icon: "#ECECEC",
+            border: "#00000000", borderSubtle: "#00000000", success: "#3D9B5F", warning: "#C48A3A", danger: "#E11D2E",
+            info: "#8A8A8A", purple: "#9B7AB8", log: "#FF101010", scroll: "#55404040", scrollHover: "#70606060")),
         new("Light", "Светлая тема", Palette(
             appBg: "#F5F5F4", sidebar: "#EEEEEC", panel: "#FAFAF9", card: "#FFFFFF", cardHover: "#F0F2F0",
             input: "#FFFFFF", elevated: "#E9ECE9", accent: "#587662", accentHover: "#496653", accentPressed: "#3D5546",
@@ -57,8 +63,12 @@ public static class ThemeService
     public static string NormalizePresetId(string? value)
     {
         if (string.Equals(value, "Light", StringComparison.OrdinalIgnoreCase)) return "Light";
+        if (string.Equals(value, "Raycast", StringComparison.OrdinalIgnoreCase)) return "Raycast";
         return "Dark";
     }
+
+    public static bool UsesAmbientGlow(string? value) =>
+        string.Equals(NormalizePresetId(value), "Raycast", StringComparison.OrdinalIgnoreCase);
 
     public static ThemePreset GetPreset(string? value) =>
         Presets.First(p => p.Id == NormalizePresetId(value));
@@ -74,7 +84,38 @@ public static class ThemeService
             var brushKey = BrushAliases.TryGetValue(key, out var alias) ? alias : $"{key}Brush";
             SetBrush(resources, brushKey, color);
         }
+
+        // Raycast: стекло — полупрозрачные кнопки и без белых контуров.
+        if (UsesAmbientGlow(preset.Id) && resources["Accent"] is WpfColor accent)
+        {
+            var glass = WithAlpha(accent, 0x58);
+            var glassHover = WithAlpha(accent, 0x7A);
+            var glassPressed = WithAlpha(accent, 0x96);
+            var ghost = WithAlpha(Colors.White, 0x14);
+            var ghostHover = WithAlpha(Colors.White, 0x22);
+            var ghostPressed = WithAlpha(Colors.White, 0x30);
+            var clear = WithAlpha(Colors.Black, 0x00);
+
+            SetBrush(resources, "PrimaryButtonBgBrush", glass);
+            SetBrush(resources, "PrimaryButtonHoverBrush", glassHover);
+            SetBrush(resources, "PrimaryButtonPressedBrush", glassPressed);
+            resources["PrimaryButtonBg"] = glass;
+            resources["PrimaryButtonHover"] = glassHover;
+            resources["PrimaryButtonPressed"] = glassPressed;
+
+            SetBrush(resources, "GhostButtonBgBrush", ghost);
+            SetBrush(resources, "GhostButtonHoverBrush", ghostHover);
+            SetBrush(resources, "GhostButtonPressedBrush", ghostPressed);
+            SetBrush(resources, "GhostButtonBorderBrush", clear);
+            resources["GhostButtonBg"] = ghost;
+            resources["GhostButtonHover"] = ghostHover;
+            resources["GhostButtonPressed"] = ghostPressed;
+            resources["GhostButtonBorder"] = clear;
+        }
     }
+
+    private static WpfColor WithAlpha(WpfColor color, byte alpha) =>
+        WpfColor.FromArgb(alpha, color.R, color.G, color.B);
 
     private static IReadOnlyDictionary<string, WpfColor> Palette(
         string appBg, string sidebar, string panel, string card, string cardHover,

@@ -22,8 +22,6 @@
 
             <!-- Шапка с drag + кнопка закрытия -->
             <Border Grid.Row="0" Style="{StaticResource DialogHeader}"
-                    CornerRadius="7,7,0,0"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <DockPanel LastChildFill="True">
                     <Button DockPanel.Dock="Right" Style="{StaticResource DialogCloseButton}" Click="Close_Click"><Path Data="{StaticResource CloseIconGeometry}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="13" Height="13" Stretch="Uniform" /></Button>
@@ -104,9 +102,7 @@
             </ScrollViewer>
 
             <!-- Нижняя панель с кнопками -->
-            <Border Grid.Row="2" Style="{StaticResource DialogFooter}"
-                    CornerRadius="0,0,7,7"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+            <Border Grid.Row="2" Style="{StaticResource DialogFooter}">
                 <WrapPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
                     <Button Content="Сохранить" Style="{StaticResource PrimaryButton}" Click="Save_Click" />
                     <Button Content="Отмена"    Style="{StaticResource GhostButton}"   Click="Cancel_Click" />

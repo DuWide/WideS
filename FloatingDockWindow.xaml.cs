@@ -44,10 +44,21 @@ public partial class FloatingDockWindow : Window
         DockNpNext.Content = MakeIcon("next", 14);
         HideButton.Content = MakeIcon("close", 14);
 
-        Deactivated += (_, _) => { if (_autoHide) HideDock(); };
+        Deactivated += (_, _) => { if (_autoHide && !_closing) HideDock(); };
+        Closing += (_, e) => { if (!e.Cancel) _closing = true; };
         Loaded += (_, _) => PositionDock();
 
         _mediaTimer.Tick += async (_, _) => await UpdateNowPlaying();
+        _rootShadow = Root.Effect;
+        ApplyPerformanceProfile();
+    }
+
+    private readonly System.Windows.Media.Effects.Effect? _rootShadow;
+
+    /// <summary>В экономичном режиме убираем тень дока: окно прозрачное (layered) и тень пересчитывается программно.</summary>
+    public void ApplyPerformanceProfile()
+    {
+        Root.Effect = PerformanceProfile.ReducedEffects ? null : _rootShadow;
     }
 
     public void Configure(string dockPosition, bool autoHide, bool showMedia = true)
@@ -83,6 +94,11 @@ public partial class FloatingDockWindow : Window
 
     public async void ShowDock()
     {
+        if (_closing)
+        {
+            return;
+        }
+
         Opacity = 0;
         Show();
         PositionDock();
@@ -108,8 +124,15 @@ public partial class FloatingDockWindow : Window
         }
     }
 
+    private bool _closing;
+
     public void HideDock()
     {
+        if (_closing)
+        {
+            return;
+        }
+
         _mediaTimer.Stop();
         Hide();
     }
@@ -192,6 +215,12 @@ public partial class FloatingDockWindow : Window
         {
             MediaPanel.Visibility = Visibility.Collapsed;
             MediaSeparator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Док скрыт — опрос и перерисовка не нужны; при показе док обновится сам.
+        if (!IsVisible)
+        {
             return;
         }
 

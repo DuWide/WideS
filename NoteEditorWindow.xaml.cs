@@ -40,7 +40,6 @@ public partial class NoteEditorWindow : Window
         _originalImportant = Note.IsImportant;
         _originalWorkspaceId = Note.WorkspaceId;
         LoadData();
-        EditorWindowHelper.HookConfirmClose(this, () => !Saved && IsDirty(), () => TrySave(showValidationErrors: true));
     }
 
     private void LoadData()
@@ -102,13 +101,7 @@ public partial class NoteEditorWindow : Window
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => EditorWindowHelper.MinimizeWindow(this);
 
-    private void Cancel_Click(object sender, RoutedEventArgs e)
-    {
-        if (EditorWindowHelper.ConfirmClose(this, !Saved && IsDirty(), () => TrySave(showValidationErrors: true)))
-        {
-            Close();
-        }
-    }
+    private void Cancel_Click(object sender, RoutedEventArgs e) => Close();
 
     private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e) =>
         EditorWindowHelper.TitleBar_MouseLeftButtonDown(this, e);

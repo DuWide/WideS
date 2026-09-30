@@ -19,7 +19,6 @@ public partial class NoteViewWindow : Window
         BodyText.Text = _originalText;
         UiHelpers.BuildNotePreview(PreviewPanel, _originalText);
         BodyText.TextChanged += (_, _) => UiHelpers.BuildNotePreview(PreviewPanel, BodyText.Text);
-        EditorWindowHelper.HookConfirmClose(this, () => !Saved && IsDirty, TrySave);
         Loaded += (_, _) =>
         {
             BodyText.Focus();
@@ -47,11 +46,5 @@ public partial class NoteViewWindow : Window
         return true;
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e)
-    {
-        if (EditorWindowHelper.ConfirmClose(this, !Saved && IsDirty, TrySave))
-        {
-            Close();
-        }
-    }
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

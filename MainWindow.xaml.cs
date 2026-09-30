@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfButton = System.Windows.Controls.Button;
@@ -25,8 +26,6 @@ public partial class MainWindow : Window
     private const int HotkeyDock = 1003;
     private const int HotkeySearch = 1004;
     private const int WmHotkey = 0x0312;
-    private const int WmGetMinMaxInfo = 0x0024;
-    private const uint MonitorDefaultToNearest = 0x00000002;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
     private const uint VkF1 = 0x70;
@@ -60,7 +59,6 @@ public partial class MainWindow : Window
     private string _connectionTypeFilter = "Все";
     private readonly Stack<string> _backStack = new();
     private readonly Stack<string> _forwardStack = new();
-    private readonly List<string> _openTabs = [];
     private string? _currentViewKey;
     private bool _isHistoryNavigation;
     private readonly DispatcherTimer _taskTimer = new() { Interval = TimeSpan.FromMinutes(1) };
@@ -68,6 +66,10 @@ public partial class MainWindow : Window
     private readonly MediaService _mediaService = new();
     private readonly DispatcherTimer _mediaTimer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _telegramTimer = new() { Interval = TimeSpan.FromSeconds(45) };
+    // Журнал пишется на диск не на каждое действие (fsync + .bak на UI-потоке), а не чаще раза в 2 с.
+    private readonly DispatcherTimer _activitySaveTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private string? _lastNowPlayingKey;
+    private byte[]? _lastNowPlayingArt;
     private readonly TelegramTaskService _telegramTaskService = new();
     private DateTime _lastTelegramDesktopWriteUtc = DateTime.MinValue;
     private TaskReminderWindow? _activeReminderWindow;
@@ -85,18 +87,34 @@ public partial class MainWindow : Window
         AppPaths.EnsureDataDirectory();
         InitializeWindowIcons();
         LoadData();
+        if (WindowBoundsService.IsPlacementMaximized(_settings.MainWindowPlacement))
+        {
+            WindowState = WindowState.Maximized;
+        }
         AfterLoadData();
         BuildNavGrouped();
         SetupTrayIcon();
         _taskTimer.Tick += (_, _) => CheckTaskReminders();
         _taskTimer.Start();
-        _pillTimer.Tick += (_, _) => UpdateActiveTaskPill();
+        _pillTimer.Tick += (_, _) =>
+        {
+            // Секундомер задачи в заголовке не нужен, пока окно в трее или свёрнуто.
+            if (IsVisible && WindowState != WindowState.Minimized) UpdateActiveTaskPill();
+        };
+        _activitySaveTimer.Tick += (_, _) => FlushActivityLog();
+        Dispatcher.ShutdownStarted += (_, _) => FlushPendingSaves();
+        IsVisibleChanged += (_, _) => OnWindowVisibilityChanged();
+        StateChanged += (_, _) => OnWindowVisibilityChanged();
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+        PreviewMouseMove += OnGlowMouseMove;
         Loaded += (_, _) =>
         {
             SingleInstanceService.StartActivationListener(this, _ => ShowFromTray());
             CheckTaskReminders();
             UpdateActiveTaskPill();
+            UpdateResponsiveSidebar();
         };
+        SizeChanged += (_, _) => UpdateResponsiveSidebar();
         TaskNotificationService.NotificationActivated += OnTaskNotificationActivated;
         ShowProjects();
         InitializeNowPlaying();
@@ -116,9 +134,9 @@ public partial class MainWindow : Window
 
     private async void InitializeNowPlaying()
     {
-        NpPrev.Content = MakeIcon("prev", 14);
-        NpPlay.Content = MakeIcon("play", 15);
-        NpNext.Content = MakeIcon("next", 14);
+        NpPrev.Content = MakeIcon("prev", 13);
+        NpPlay.Content = MakeIcon("play", 14);
+        NpNext.Content = MakeIcon("next", 13);
         try
         {
             await _mediaService.InitializeAsync();
@@ -137,6 +155,13 @@ public partial class MainWindow : Window
         if (!WorkModeService.ShowMedia(_settings.WorkMode))
         {
             NowPlayingPanel.Visibility = Visibility.Collapsed;
+            _lastNowPlayingKey = null;
+            return;
+        }
+
+        // Окно в трее или свёрнуто: мини-плеер не виден — не опрашиваем систему и не перерисовываем.
+        if (!IsVisible || WindowState == WindowState.Minimized)
+        {
             return;
         }
 
@@ -144,19 +169,35 @@ public partial class MainWindow : Window
         if (!snap.HasSession)
         {
             NowPlayingPanel.Visibility = Visibility.Collapsed;
+            _lastNowPlayingKey = null;
             return;
         }
 
+        // Раньше каждые 2 с заново декодировалась обложка и пересоздавались иконки, даже без изменений.
+        var key = $"{snap.Source}\n{snap.Title}\n{snap.Artist}\n{snap.IsPlaying}";
+        if (key == _lastNowPlayingKey && ReferenceEquals(snap.AlbumArt, _lastNowPlayingArt) &&
+            NowPlayingPanel.Visibility == Visibility.Visible)
+        {
+            return;
+        }
+
+        _lastNowPlayingKey = key;
+        _lastNowPlayingArt = snap.AlbumArt;
         NowPlayingPanel.Visibility = Visibility.Visible;
         NpTitle.Text = snap.Title;
         NpArtist.Text = snap.Artist;
-        NpSource.Text = string.IsNullOrWhiteSpace(snap.Source) ? "СЕЙЧАС ИГРАЕТ" : snap.Source.ToUpperInvariant();
-        NpPlay.Content = MakeIcon(snap.IsPlaying ? "pause" : "play", 15);
+        var source = string.IsNullOrWhiteSpace(snap.Source) ? "Сейчас играет" : snap.Source;
+        NowPlayingPanel.ToolTip = string.IsNullOrWhiteSpace(snap.Artist)
+            ? $"{source}: {snap.Title}"
+            : $"{source}: {snap.Title} — {snap.Artist}";
+        NpPlay.Content = MakeIcon(snap.IsPlaying ? "pause" : "play", 14);
         UiHelpers.SetAlbumArt(NpAlbumArt, snap.AlbumArt);
-        if (_settings.CompactSidebar)
-        {
-            NpAlbumArt.Visibility = Visibility.Collapsed;
-        }
+    }
+
+    private void NowPlayingPanel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Клики по плееру не должны начинать перетаскивание окна.
+        e.Handled = true;
     }
 
     private async void NpPlay_Click(object sender, RoutedEventArgs e)
@@ -395,12 +436,16 @@ public partial class MainWindow : Window
         "connections" => "nav-connections",
         "messengers" => "nav-messengers",
         "music" => "music",
+        "tiktok" => "nav-tiktok",
+        "manga" => "nav-manga",
         "settings" => "nav-settings",
         _ => "nav-projects"
     };
 
-    private void AddNav(string text, string key, Action action)
+    private void AddNav(string text, string key, Action action, System.Windows.Controls.Panel? target = null)
     {
+        _navActions.Add(action);
+        var hotkey = _navActions.Count <= 9 ? $" (Ctrl+{_navActions.Count})" : "";
         var label = new TextBlock
         {
             Text = text,
@@ -415,7 +460,7 @@ public partial class MainWindow : Window
         {
             Content = stack,
             Tag = key,
-            ToolTip = text,
+            ToolTip = text + hotkey,
             Style = RequireStyle("NavButton")
         };
         System.Windows.Automation.AutomationProperties.SetName(button, text);
@@ -424,7 +469,7 @@ public partial class MainWindow : Window
             action();
         };
         _sideNavButtons[key] = button;
-        NavPanel.Children.Add(button);
+        (target ?? NavPanel).Children.Add(button);
     }
 
     private void UpdateNavHighlight(string? viewKey = null)
@@ -438,6 +483,8 @@ public partial class MainWindow : Window
             "tasks"       => "tasks",
             "messengers"  => "messengers",
             "music"       => "music",
+            "tiktok"      => "tiktok",
+            "manga"       => "manga",
             "settings"    => "settings",
             _ => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase) ? "projects" : null
         };
@@ -446,10 +493,11 @@ public partial class MainWindow : Window
             _activeSideNavKey = sideKey;
         }
 
+        var activeStyle = _compactSidebarApplied == true ? "NavButtonActiveCompact" : "NavButtonActive";
         foreach (var (navKey, button) in _sideNavButtons)
         {
             button.Style = RequireStyle(navKey.Equals(_activeSideNavKey, StringComparison.OrdinalIgnoreCase)
-                ? "NavButtonActive"
+                ? activeStyle
                 : "NavButton");
         }
 
@@ -457,13 +505,39 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 2)
+        if (e.ChangedButton != MouseButton.Left)
         {
-            ToggleMaximize();
             return;
         }
 
-        DragMove();
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximize();
+            e.Handled = true;
+            return;
+        }
+
+        if (WindowState == WindowState.Maximized)
+        {
+            RestoreFromMaximizedForDrag(e.GetPosition(this));
+        }
+
+        try
+        {
+            DragMove();
+        }
+        catch (InvalidOperationException)
+        {
+            // DragMove может бросить, если кнопка мыши уже отпущена.
+        }
+    }
+
+    /// <summary>Как в Windows: при перетаскивании развёрнутого окна — свернуть и держать курсор на title bar.</summary>
+    private void RestoreFromMaximizedForDrag(System.Windows.Point mouseInWindow)
+    {
+        // Общая реализация учитывает DPI и монитор под курсором (см. EditorWindowHelper).
+        EditorWindowHelper.RestoreFromMaximizedForDrag(this, mouseInWindow);
+        SyncMaximizeButtonIcon();
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -474,6 +548,20 @@ public partial class MainWindow : Window
 
     private void DockToggle_Click(object sender, RoutedEventArgs e) => ToggleDock();
 
+    private void Journal_Click(object sender, RoutedEventArgs e)
+    {
+        _logSessionCount = 0;
+        _logSessionErrorCount = 0;
+        UpdateLogPreview();
+        ShowLogView();
+    }
+
+    private void ActiveTaskPill_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        // Не начинать DragMove окна при клике по pill задачи.
+        e.Handled = true;
+    }
+
     private void CloseWindow_Click(object sender, RoutedEventArgs e) => HideToTray();
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -481,6 +569,12 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         _hwndSource = HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);
         _hwndSource?.AddHook(WndProc);
+        // Разворачивание строго в рабочую область монитора (панель задач, разные DPI и размеры мониторов).
+        WindowBoundsService.Attach(this);
+        // Положение с прошлого запуска (монитор, размер); ниже EnsureVisible зажимает его в видимый экран.
+        WindowBoundsService.RestorePlacement(this, _settings.MainWindowPlacement);
+        // 1360×860 DIP при масштабе 150% на ноутбуке 1920×1080 больше экрана — ужимаем до рабочей области.
+        WindowBoundsService.EnsureVisible(this);
         var handle = new WindowInteropHelper(this).Handle;
         RegisterHotKey(handle, HotkeyNewNote, ModAlt, VkF1);
         RegisterHotKey(handle, HotkeyNewTask, ModAlt, VkF2);
@@ -508,6 +602,8 @@ public partial class MainWindow : Window
         UnregisterHotKey(handle, HotkeyDock);
         UnregisterHotKey(handle, HotkeySearch);
         _hwndSource?.RemoveHook(WndProc);
+        SaveWindowPlacement();
+        FlushPendingSaves();
         _dockWindow?.Close();
         _trayIcon?.Dispose();
         DisposeWebApps();
@@ -543,37 +639,49 @@ public partial class MainWindow : Window
                 handled = true;
             }
         }
-        else if (msg == WmGetMinMaxInfo)
-        {
-            ApplyMaximizeWorkArea(hwnd, lParam);
-            handled = true;
-        }
 
         return IntPtr.Zero;
     }
 
-    private static void ApplyMaximizeWorkArea(IntPtr hwnd, IntPtr lParam)
+    private void OnWindowVisibilityChanged()
     {
-        var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
-        if (monitor == IntPtr.Zero)
+        UpdateGlowAnimationState();
+        if (IsVisible && WindowState != WindowState.Minimized)
         {
-            return;
+            _ = UpdateNowPlaying();
+            UpdateActiveTaskPill();
+        }
+    }
+
+    private void ScheduleActivitySave()
+    {
+        if (!_activitySaveTimer.IsEnabled)
+        {
+            _activitySaveTimer.Start();
+        }
+    }
+
+    private void FlushActivityLog()
+    {
+        _activitySaveTimer.Stop();
+        try
+        {
+            _activityStore.Save(_activity);
+        }
+        catch
+        {
+            // Журнал действий не критичен: следующая запись повторит сохранение.
+        }
+    }
+
+    private void FlushPendingSaves()
+    {
+        if (_activitySaveTimer.IsEnabled)
+        {
+            FlushActivityLog();
         }
 
-        var monitorInfo = new MonitorInfo { cbSize = Marshal.SizeOf<MonitorInfo>() };
-        if (!GetMonitorInfo(monitor, ref monitorInfo))
-        {
-            return;
-        }
-
-        var work = monitorInfo.rcWork;
-        var monitorRect = monitorInfo.rcMonitor;
-        mmi.ptMaxPosition.X = Math.Abs(work.Left - monitorRect.Left);
-        mmi.ptMaxPosition.Y = Math.Abs(work.Top - monitorRect.Top);
-        mmi.ptMaxSize.X = Math.Abs(work.Right - work.Left);
-        mmi.ptMaxSize.Y = Math.Abs(work.Bottom - work.Top);
-        Marshal.StructureToPtr(mmi, lParam, true);
+        FlushMangaLastUrl();
     }
 
     private void SetupTrayIcon()
@@ -599,15 +707,24 @@ public partial class MainWindow : Window
 
     private void InitializeWindowIcons()
     {
+        // Все иконки заголовка — единого размера 16 px.
         MinimizeButton.Content = MakeIcon("minus", 16);
         MaximizeButton.Content = MakeIcon("maximize", 16);
         CloseButton.Content = MakeIcon("close", 16);
-        BackButton.Content = MakeIcon("back", 18);
-        ForwardButton.Content = MakeIcon("forward", 18);
-        GlobalSearchButton.Content = MakeIcon("search", 15);
-        DockToggleButton.Content = MakeIcon("dock", 15);
+        BackButton.Content = MakeIcon("back", 16);
+        ForwardButton.Content = MakeIcon("forward", 16);
+        GlobalSearchButton.Content = MakeIcon("search", 16);
+        DockToggleButton.Content = MakeIcon("dock", 16);
+        JournalButton.Content = MakeIcon("journal", 16);
+        WebZoomOutButton.Content = MakeIcon("minus", 16);
+        WebZoomInButton.Content = MakeIcon("plus", 16);
+        WebHomeButton.Content = MakeIcon("home", 16);
+        WebReloadButton.Content = MakeIcon("reload", 16);
+        WebReaderButton.Content = MakeIcon("fullscreen", 16);
         StyleQuietIconButton(BackButton);
         StyleQuietIconButton(ForwardButton);
+        StateChanged += (_, _) => ApplyWindowStateChrome();
+        ApplyWindowStateChrome();
     }
 
     private void StyleQuietIconButton(WpfButton button)
@@ -617,7 +734,27 @@ public partial class MainWindow : Window
 
     private void HideToTray()
     {
+        SaveWindowPlacement();
         Hide();
+    }
+
+    private void SaveWindowPlacement()
+    {
+        var placement = WindowBoundsService.CapturePlacement(this);
+        if (string.IsNullOrEmpty(placement) || placement == _settings.MainWindowPlacement)
+        {
+            return;
+        }
+
+        _settings.MainWindowPlacement = placement;
+        try
+        {
+            _settingsStore.Save(_settings);
+        }
+        catch
+        {
+            // Положение окна не критично.
+        }
     }
 
     private void ShowFromTray()
@@ -628,49 +765,40 @@ public partial class MainWindow : Window
     private void ToggleMaximize()
     {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        MaximizeButton.Content = MakeIcon(WindowState == WindowState.Maximized ? "restore" : "maximize", 16);
+        ApplyWindowStateChrome();
     }
 
-    private void LogPanel_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e) => ExpandLogPanel();
-
-    private void LogPanel_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) => CollapseLogPanel();
-
-    private void LogPanel_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void SyncMaximizeButtonIcon()
     {
-        if (LogBox.Visibility == Visibility.Visible)
+        var maximized = WindowState == WindowState.Maximized;
+        MaximizeButton.Content = MakeIcon(maximized ? "restore" : "maximize", 16);
+        MaximizeButton.ToolTip = maximized ? "Восстановить" : "Развернуть";
+        System.Windows.Automation.AutomationProperties.SetName(MaximizeButton, maximized ? "Восстановить" : "Развернуть");
+    }
+
+    private void ApplyWindowStateChrome()
+    {
+        SyncMaximizeButtonIcon();
+        var maximized = WindowState == WindowState.Maximized;
+        var radius = maximized ? new CornerRadius(0) : new CornerRadius(8);
+        var titleRadius = maximized ? new CornerRadius(0) : new CornerRadius(7, 7, 0, 0);
+        RootChromeBorder.CornerRadius = radius;
+        TitleBarBorder.CornerRadius = titleRadius;
+        if (WindowChrome.GetWindowChrome(this) is { } chrome)
         {
-            ShowLogView();
+            chrome.CornerRadius = radius;
         }
-        else
-        {
-            ExpandLogPanel();
-        }
-    }
-
-    private void CollapseLogPanel()
-    {
-        _logExpanded = false;
-        LogPanel.Height = 38;
-        LogBox.Visibility = Visibility.Collapsed;
-        LogPreview.Visibility = Visibility.Visible;
-    }
-
-    private void ExpandLogPanel()
-    {
-        if (_logExpanded) return;
-        _logExpanded = true;
-        LogPanel.Height = 150;
-        LogBox.Visibility = Visibility.Visible;
-        LogPreview.Visibility = Visibility.Collapsed;
-        _logSessionCount = 0;
-        UpdateLogPreview();
     }
 
     private void EnterView(string key)
     {
+        if (_immersiveMode && key != "manga")
+        {
+            SetImmersiveMode(false);
+        }
+
         if (_currentViewKey == key)
         {
-            RenderTabs();
             return;
         }
 
@@ -681,11 +809,6 @@ public partial class MainWindow : Window
         }
 
         _currentViewKey = key;
-        if (IsTabView(key) && !_openTabs.Contains(key))
-        {
-            _openTabs.Add(key);
-        }
-        RenderTabs();
         UpdateNavHighlight(key);
         UpdateNavigationButtons();
     }
@@ -740,6 +863,8 @@ public partial class MainWindow : Window
                 case "tasks": ShowTasks(); break;
                 case "messengers": ShowMessengers(); break;
                 case "music": ShowMusic(); break;
+                case "tiktok": ShowTikTok(); break;
+                case "manga": ShowManga(); break;
                 case "history": ShowHistory(); break;
                 case "settings": ShowSettings(); break;
                 default: ShowProjects(); break;
@@ -750,69 +875,6 @@ public partial class MainWindow : Window
             _isHistoryNavigation = false;
         }
     }
-
-    private void RenderTabs()
-    {
-        TabsPanel.Children.Clear();
-        foreach (var key in _openTabs.Where(IsTabView).ToList())
-        {
-            var title = TabTitle(key);
-            var shell = new Border
-            {
-                Height = 30,
-                MinWidth = 120,
-                Padding = new Thickness(10, 0, 4, 0),
-                Margin = new Thickness(0, 2, 6, 2),
-                CornerRadius = new CornerRadius(8),
-                Background = key == _currentViewKey
-                    ? (WpfBrush)FindResource("FilterBgBrush")
-                    : (WpfBrush)FindResource("PanelBrush"),
-                BorderBrush = key == _currentViewKey
-                    ? (WpfBrush)FindResource("FilterBorderBrush")
-                    : (WpfBrush)FindResource("BorderMainBrush"),
-                BorderThickness = new Thickness(1),
-                ToolTip = title
-            };
-            var row = new DockPanel { LastChildFill = true };
-            var close = IconButton("close", () =>
-            {
-                _openTabs.Remove(key);
-                if (_currentViewKey == key)
-                {
-                    ShowProjects();
-                }
-                else
-                {
-                    RenderTabs();
-                }
-            }, "Закрыть вкладку", 24);
-            close.Width = 24;
-            close.Height = 24;
-            close.Margin = new Thickness(8, 2, 0, 2);
-            DockPanel.SetDock(close, System.Windows.Controls.Dock.Right);
-            row.Children.Add(close);
-
-            var tab = new WpfButton
-            {
-                Content = title,
-                Height = 28,
-                MinWidth = 72,
-                MaxHeight = 28,
-                Padding = new Thickness(0),
-                Margin = new Thickness(0),
-                Background = WpfBrushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Foreground = (WpfBrush)FindResource("TextBrush"),
-                ToolTip = title
-            };
-            tab.Click += (_, _) => ActivateView(key);
-            row.Children.Add(tab);
-            shell.Child = row;
-            TabsPanel.Children.Add(shell);
-        }
-    }
-
-    private static bool IsTabView(string key) => key.StartsWith("project:", StringComparison.OrdinalIgnoreCase);
 
     private string TabTitle(string key)
     {
@@ -829,6 +891,7 @@ public partial class MainWindow : Window
             "projects" => "Проекты",
             "tasks" => "Задачи",
             "history" => "История",
+            "manga" => "Манга",
             "settings" => "Настройки",
             _ => key
         };
@@ -1062,6 +1125,10 @@ public partial class MainWindow : Window
         LogBox.AppendText($"[{DateTime.Now:HH:mm:ss}] {status}  {message}{Environment.NewLine}");
         LogBox.ScrollToEnd();
         _logSessionCount++;
+        if (string.Equals(status, "ERR", StringComparison.OrdinalIgnoreCase))
+        {
+            _logSessionErrorCount++;
+        }
         UpdateLogPreview();
         _activity.Entries.Add(new ActivityEntry
         {
@@ -1074,7 +1141,7 @@ public partial class MainWindow : Window
         {
             _activity.Entries = _activity.Entries.OrderByDescending(x => x.At).Take(1000).OrderBy(x => x.At).ToList();
         }
-        _activityStore.Save(_activity);
+        ScheduleActivitySave();
     }
 
     private WpfBrush ThemeBorderMain() => (WpfBrush)FindResource("BorderMainBrush");
@@ -1211,34 +1278,67 @@ public partial class MainWindow : Window
         return button;
     }
 
+    private bool IsRaycastUi => ThemeService.UsesAmbientGlow(_settings.AccentTheme);
+
     private WpfButton FilterButton(string text, bool selected, Action action)
     {
         var button = new WpfButton
         {
             Content = text,
             Style = (Style)FindResource("GhostButton"),
-            Height = 36,
-            MinWidth = 78,
+            Height = IsRaycastUi ? 32 : 36,
+            MinWidth = IsRaycastUi ? 64 : 78,
             MaxHeight = 36,
-            Padding = new Thickness(12, 6, 12, 6),
+            Padding = IsRaycastUi ? new Thickness(14, 5, 14, 5) : new Thickness(12, 6, 12, 6),
             Margin = new Thickness(3),
             VerticalAlignment = VerticalAlignment.Top,
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left,
             Cursor = System.Windows.Input.Cursors.Hand
         };
-        var bg = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("GhostButtonBgBrush");
-        var border = selected ? (WpfBrush)FindResource("FilterBorderBrush") : (WpfBrush)FindResource("BorderMainBrush");
-        button.Background = bg;
-        button.BorderBrush = border;
-        button.Foreground = (WpfBrush)FindResource("TextBrush");
+
+        void ApplyVisual()
+        {
+            if (IsRaycastUi)
+            {
+                // Выбранный фильтр — светлая подложка и красный текст, а не сплошная красная заливка:
+                // так он не спорит с главной кнопкой действия.
+                button.Background = selected
+                    ? (WpfBrush)FindResource("ElevatedBgBrush")
+                    : System.Windows.Media.Brushes.Transparent;
+                button.BorderBrush = (WpfBrush)FindResource("BorderSubtleBrush");
+                button.BorderThickness = new Thickness(0);
+                button.Foreground = selected
+                    ? (WpfBrush)FindResource("AccentBrush")
+                    : (WpfBrush)FindResource("TextBrush");
+                button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+            }
+            else
+            {
+                button.Background = selected
+                    ? (WpfBrush)FindResource("FilterBgBrush")
+                    : (WpfBrush)FindResource("GhostButtonBgBrush");
+                button.BorderBrush = selected
+                    ? (WpfBrush)FindResource("FilterBorderBrush")
+                    : (WpfBrush)FindResource("BorderMainBrush");
+                button.Foreground = (WpfBrush)FindResource("TextBrush");
+            }
+        }
+
+        ApplyVisual();
         button.MouseEnter += (_, _) =>
         {
-            button.Background = selected ? (WpfBrush)FindResource("FilterBgBrush") : (WpfBrush)FindResource("CardHoverBrush");
+            if (IsRaycastUi && !selected)
+            {
+                button.Background = (WpfBrush)FindResource("NavHoverBgBrush");
+            }
+            else if (!IsRaycastUi)
+            {
+                button.Background = selected
+                    ? (WpfBrush)FindResource("FilterBgBrush")
+                    : (WpfBrush)FindResource("CardHoverBrush");
+            }
         };
-        button.MouseLeave += (_, _) =>
-        {
-            button.Background = bg;
-        };
+        button.MouseLeave += (_, _) => ApplyVisual();
         button.Click += (_, _) => action();
         return button;
     }
@@ -1495,22 +1595,37 @@ public partial class MainWindow : Window
         {
             bgKey = "DangerSoftBgBrush";
             borderKey = "DangerBrush";
+            foregroundKey = "TextBrush";
         }
         else if (lower.Contains("пауза") || lower.Contains("отлож"))
         {
             bgKey = "FocusWarnBgBrush";
             borderKey = "WarnBrush";
+            foregroundKey = "TextBrush";
         }
         else if (lower.Contains("заверш"))
         {
             bgKey = "SuccessSoftBgBrush";
             borderKey = "SuccessBrush";
+            foregroundKey = "TextBrush";
         }
         else if ((lower.Contains("плит") || lower.Contains("спис")) && primary)
         {
             bgKey = "FilterBgBrush";
             borderKey = "FilterBorderBrush";
             foregroundKey = "TextBrush";
+        }
+        else if (IsRaycastUi && primary)
+        {
+            // Стеклянная заливка: без контура, только полупрозрачный цвет.
+            bgKey = "PrimaryButtonBgBrush";
+            borderKey = "PrimaryButtonBgBrush";
+            foregroundKey = "AccentForegroundBrush";
+            button.BorderThickness = new Thickness(0);
+        }
+        else if (IsRaycastUi)
+        {
+            button.BorderThickness = new Thickness(0);
         }
 
         button.Background = (WpfBrush)FindResource(bgKey);
@@ -1680,45 +1795,5 @@ public partial class MainWindow : Window
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-    [DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PointNative
-    {
-        public int X;
-        public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MinMaxInfo
-    {
-        public PointNative ptReserved;
-        public PointNative ptMaxSize;
-        public PointNative ptMaxPosition;
-        public PointNative ptMinTrackSize;
-        public PointNative ptMaxTrackSize;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RectNative
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-    private struct MonitorInfo
-    {
-        public int cbSize;
-        public RectNative rcMonitor;
-        public RectNative rcWork;
-        public int dwFlags;
-    }
 }
 

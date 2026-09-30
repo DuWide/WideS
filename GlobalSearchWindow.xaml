@@ -18,9 +18,15 @@
             </Grid.RowDefinitions>
             <Border Padding="16,14,16,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
                 <StackPanel>
-                    <TextBox x:Name="SearchBox" FontSize="16" MinHeight="36"
-                             KeyDown="SearchBox_KeyDown" TextChanged="SearchBox_TextChanged" />
-                    <TextBlock Text="Проекты, задачи, заметки и подключения"
+                    <DockPanel LastChildFill="True">
+                        <Button x:Name="CloseSearchButton" DockPanel.Dock="Right" Width="32" Height="32"
+                                Margin="8,0,0,0" VerticalAlignment="Center"
+                                Style="{StaticResource DialogCloseButton}"
+                                ToolTip="Закрыть (Esc)" Click="CloseSearch_Click" />
+                        <TextBox x:Name="SearchBox" FontSize="16" MinHeight="36"
+                                 KeyDown="SearchBox_KeyDown" TextChanged="SearchBox_TextChanged" />
+                    </DockPanel>
+                    <TextBlock Text="Проекты, задачи, заметки и подключения · Esc — закрыть"
                                Foreground="{DynamicResource MutedBrush}" FontSize="11" Margin="0,8,0,0" />
                 </StackPanel>
             </Border>

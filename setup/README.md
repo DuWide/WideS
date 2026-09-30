@@ -8,16 +8,23 @@ setup\build-setup.bat
 
 Результат:
 - `setup\output\WideS-Setup.exe` — установщик для пользователей (~60 МБ, .NET внутри)
-- `setup\output\WideS-Setup-portable.zip` — zip с `WideS-Setup.bat` (без Inno Setup)
+
+## Обновление на другом ПК
+
+1. Закрой WideS (если запущен).
+2. Запусти новый `WideS-Setup.exe` поверх старой установки.
+3. Мастер определит существующую программу и обновит её в `%LocalAppData%\Programs\WideS`.
+4. Данные в `%AppData%\WideS` не трогаются.
+
+Удалять старую версию вручную не нужно — тот же `AppId`, установка идёт поверх.
 
 ## Файлы
 
 | Путь | Назначение |
 |------|------------|
-| `build-setup.ps1` | publish self-contained + zip + Inno Setup |
+| `build-setup.ps1` | publish self-contained + Inno Setup |
 | `WideS.iss` | скрипт Inno Setup 6 |
 | `WideS-Setup/app/` | промежуточная сборка (не коммитить) |
-| `WideS-Setup/WideS-Setup.ps1` | portable-установка без Inno |
 | `Properties/PublishProfiles/Setup-win-x64.pubxml` | профиль dotnet publish |
 
 ## У пользователя

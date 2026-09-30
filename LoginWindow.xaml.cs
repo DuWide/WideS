@@ -24,11 +24,14 @@ public partial class LoginWindow : Window
 
     private void Login_Click(object sender, RoutedEventArgs e) => TryLogin();
 
+    /// <summary>Пароль был в старом формате и после входа переведён на хэш — настройки надо сохранить.</summary>
+    public bool PasswordUpgraded { get; private set; }
+
     private void TryLogin()
     {
-        var expected = SecretService.Unprotect(_settings.LoginPasswordEncrypted);
-        if (string.IsNullOrEmpty(expected) || PasswordInput.Password == expected)
+        if (SecretService.VerifyLogin(_settings, PasswordInput.Password, out var upgraded))
         {
+            PasswordUpgraded = upgraded;
             DialogResult = true;
             return;
         }

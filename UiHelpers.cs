@@ -77,7 +77,7 @@ public static class UiHelpers
         };
     }
 
-    public static Border EmptyState(string title, string hint, string actionText, Action action)
+    public static Border EmptyState(string title, string hint, string? actionText, Action? action)
     {
         var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
         stack.Children.Add(new TextBlock
@@ -98,23 +98,28 @@ public static class UiHelpers
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
         });
-        var button = new WpfButton
+        if (!string.IsNullOrEmpty(actionText) && action is not null)
         {
-            Content = actionText,
-            Style = System.Windows.Application.Current.TryFindResource("PrimaryButton") as Style,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Cursor = System.Windows.Input.Cursors.Hand
-        };
-        button.Click += (_, _) => action();
-        stack.Children.Add(button);
+            var button = new WpfButton
+            {
+                Content = actionText,
+                Style = System.Windows.Application.Current.TryFindResource("PrimaryButton") as Style,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+            button.Click += (_, _) => action();
+            stack.Children.Add(button);
+        }
 
+        stack.VerticalAlignment = VerticalAlignment.Center;
         return new Border
         {
             Style = System.Windows.Application.Current.TryFindResource("Card") as Style,
-            Width = 760,
-            MinHeight = 160,
+            Width = 560,
+            MinHeight = 140,
             Child = stack,
-            Margin = new Thickness(8)
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(8, 32, 8, 8)
         };
     }
 
@@ -213,6 +218,9 @@ public static class UiHelpers
     public static void SetAlbumArt(System.Windows.Controls.Image? image, byte[]? bytes)
     {
         if (image is null) return;
+        // Та же обложка (MediaService кэширует массив) — не декодируем картинку повторно.
+        if (bytes is not null && ReferenceEquals(image.Tag, bytes) && image.Source is not null) return;
+        image.Tag = bytes;
         if (bytes is null || bytes.Length == 0)
         {
             image.Source = null;

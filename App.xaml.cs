@@ -35,6 +35,13 @@ public partial class App : System.Windows.Application
         var settings = settingsStore.Load();
         var smokeTheme = Environment.GetEnvironmentVariable("WIDES_THEME");
         ThemeService.Apply(string.IsNullOrWhiteSpace(smokeTheme) ? settings.AccentTheme : smokeTheme);
+        PerformanceProfile.Apply(settings.PerformanceMode);
+
+        // Все окна без системной рамки разворачиваются строго в рабочую область своего монитора.
+        System.Windows.EventManager.RegisterClassHandler(
+            typeof(System.Windows.Window),
+            System.Windows.FrameworkElement.LoadedEvent,
+            new System.Windows.RoutedEventHandler(AnyWindow_Loaded));
         if (settingsAlreadyExisted && !settings.IsFirstRunConfigured)
         {
             settings.IsFirstRunConfigured = true;
@@ -51,7 +58,7 @@ public partial class App : System.Windows.Application
             }
 
             settings.UserName = firstRun.UserNameValue;
-            settings.LoginPasswordEncrypted = SecretService.Protect(firstRun.PasswordValue);
+            SecretService.SetLoginPassword(settings, firstRun.PasswordValue);
             settings.IsFirstRunConfigured = true;
             settingsStore.Save(settings);
             justConfigured = true;
@@ -72,6 +79,11 @@ public partial class App : System.Windows.Application
                 Shutdown();
                 return;
             }
+
+            if (login.PasswordUpgraded)
+            {
+                settingsStore.Save(settings);
+            }
         }
 
         var userName = string.IsNullOrWhiteSpace(settings.UserName) ? "Олег" : settings.UserName.Trim();
@@ -83,6 +95,18 @@ public partial class App : System.Windows.Application
         }
 
         StartMainWindow();
+    }
+
+    private static void AnyWindow_Loaded(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Window
+            {
+                WindowStyle: System.Windows.WindowStyle.None,
+                ResizeMode: System.Windows.ResizeMode.CanResize or System.Windows.ResizeMode.CanResizeWithGrip
+            } window)
+        {
+            WindowBoundsService.Attach(window);
+        }
     }
 
     private void StartMainWindow()

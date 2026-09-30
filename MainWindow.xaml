@@ -6,8 +6,8 @@
         Icon="Assets/WideS.ico"
         Width="1360"
         Height="860"
-        MinWidth="1040"
-        MinHeight="680"
+        MinWidth="720"
+        MinHeight="520"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="False"
@@ -16,35 +16,308 @@
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" />
     </shell:WindowChrome.WindowChrome>
-    <Border Background="{DynamicResource AppBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1" CornerRadius="8">
+    <Border x:Name="RootChromeBorder" Background="{DynamicResource AppBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="40" />
+                <RowDefinition x:Name="TitleBarRow" Height="40" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- Ambient glow / rays — только тема Raycast -->
+            <Grid x:Name="AmbientGlowLayer"
+                  Grid.RowSpan="2"
+                  IsHitTestVisible="False"
+                  Visibility="Collapsed"
+                  ClipToBounds="True"
+                  Opacity="0.85">
+                <Grid.RenderTransform>
+                    <!-- Лёгкий параллакс за курсором (MainWindow.Polish.cs) -->
+                    <TranslateTransform x:Name="GlowParallax" />
+                </Grid.RenderTransform>
+                <Grid.Resources>
+                    <!-- «Живое» свечение: каждый луч — отдельный заранее размытый и закэшированный слой (BitmapCache),
+                         анимируются только сдвиг, поворот, масштаб и прозрачность — размытие заново не считается.
+                         20 кадров/с; запускается только когда окно видно и не включён экономичный режим. -->
+                    <Storyboard x:Key="RaycastGlowPulse" Timeline.DesiredFrameRate="20">
+                        <!-- Общее «дыхание» яркости -->
+                        <DoubleAnimation Storyboard.TargetName="AmbientGlowLayer" Storyboard.TargetProperty="Opacity"
+                                         From="0.55" To="1" Duration="0:0:4.5" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <!-- Медленное покачивание веера лучей -->
+                        <DoubleAnimation Storyboard.TargetName="GlowRotate" Storyboard.TargetProperty="Angle"
+                                         From="-39" To="-25" Duration="0:0:11" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay1" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                         From="-60" To="60" Duration="0:0:7" BeginTime="-0:0:2" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay1" Storyboard.TargetProperty="Opacity"
+                                         From="0.3" To="0.8" Duration="0:0:4.2" BeginTime="-0:0:1.4" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay2" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                         From="-75" To="75" Duration="0:0:9" BeginTime="-0:0:5" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay2" Storyboard.TargetProperty="Opacity"
+                                         From="0.18" To="0.62" Duration="0:0:5.4" BeginTime="-0:0:3.5" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay3" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                         From="-55" To="55" Duration="0:0:6" BeginTime="-0:0:1" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay3" Storyboard.TargetProperty="Opacity"
+                                         From="0.1" To="0.48" Duration="0:0:3.6" BeginTime="-0:0:0.7" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay4" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                         From="-70" To="70" Duration="0:0:8" BeginTime="-0:0:4" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowRay4" Storyboard.TargetProperty="Opacity"
+                                         From="0.06" To="0.36" Duration="0:0:4.8" BeginTime="-0:0:2.8" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <!-- Пятно внизу слева «разгорается» и гаснет -->
+                        <DoubleAnimation Storyboard.TargetName="GlowSpot" Storyboard.TargetProperty="Opacity"
+                                         From="0.25" To="0.65" Duration="0:0:6.5" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowSpotScale" Storyboard.TargetProperty="ScaleX"
+                                         From="0.9" To="1.25" Duration="0:0:8" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetName="GlowSpotScale" Storyboard.TargetProperty="ScaleY"
+                                         From="0.9" To="1.25" Duration="0:0:8" AutoReverse="True" RepeatBehavior="Forever">
+                            <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                    </Storyboard>
+                </Grid.Resources>
+
+                <!-- Диагональные «лучи» как у Raycast, не статичный круг.
+                     BitmapCache: размытие считается один раз, а не на каждом кадре анимации прозрачности. -->
+                <!-- Без ClipToBounds: обрезка повёрнутого холста давала резкую диагональную кромку при покачивании лучей; окно и так обрезает слой. -->
+                <Canvas>
+                    <Canvas.RenderTransform>
+                        <RotateTransform x:Name="GlowRotate" Angle="-32" CenterX="200" CenterY="400" />
+                    </Canvas.RenderTransform>
+                    <Border x:Name="GlowRay1" Canvas.Left="-80" Canvas.Top="-120" Opacity="0.55">
+                        <Border.CacheMode><BitmapCache /></Border.CacheMode>
+                        <Border.RenderTransform><TranslateTransform /></Border.RenderTransform>
+                        <Rectangle Width="90" Height="980">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#00C01018" Offset="0" />
+                                    <GradientStop Color="#CCE11D2E" Offset="0.45" />
+                                    <GradientStop Color="#00C01018" Offset="1" />
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="28" KernelType="Gaussian" />
+                            </Rectangle.Effect>
+                        </Rectangle>
+                    </Border>
+                    <Border x:Name="GlowRay2" Canvas.Left="40" Canvas.Top="-80" Opacity="0.4">
+                        <Border.CacheMode><BitmapCache /></Border.CacheMode>
+                        <Border.RenderTransform><TranslateTransform /></Border.RenderTransform>
+                        <Rectangle Width="70" Height="920">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#00A00C12" Offset="0" />
+                                    <GradientStop Color="#AAE11D2E" Offset="0.5" />
+                                    <GradientStop Color="#00A00C12" Offset="1" />
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="36" KernelType="Gaussian" />
+                            </Rectangle.Effect>
+                        </Rectangle>
+                    </Border>
+                    <Border x:Name="GlowRay3" Canvas.Left="150" Canvas.Top="-40" Opacity="0.28">
+                        <Border.CacheMode><BitmapCache /></Border.CacheMode>
+                        <Border.RenderTransform><TranslateTransform /></Border.RenderTransform>
+                        <Rectangle Width="55" Height="860">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#00800810" Offset="0" />
+                                    <GradientStop Color="#88E11D2E" Offset="0.5" />
+                                    <GradientStop Color="#00800810" Offset="1" />
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="40" KernelType="Gaussian" />
+                            </Rectangle.Effect>
+                        </Rectangle>
+                    </Border>
+                    <Border x:Name="GlowRay4" Canvas.Left="250" Canvas.Top="0" Opacity="0.18">
+                        <Border.CacheMode><BitmapCache /></Border.CacheMode>
+                        <Border.RenderTransform><TranslateTransform /></Border.RenderTransform>
+                        <Rectangle Width="48" Height="800">
+                            <Rectangle.Fill>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#0060060C" Offset="0" />
+                                    <GradientStop Color="#66E11D2E" Offset="0.5" />
+                                    <GradientStop Color="#0060060C" Offset="1" />
+                                </LinearGradientBrush>
+                            </Rectangle.Fill>
+                            <Rectangle.Effect>
+                                <BlurEffect Radius="44" KernelType="Gaussian" />
+                            </Rectangle.Effect>
+                        </Rectangle>
+                    </Border>
+                </Canvas>
+
+                <!-- Мягкое пятно внизу слева — глубина -->
+                <!-- Кэш на обёртке: размытие попадает внутрь закэшированной картинки,
+                     а масштаб/прозрачность обёртки применяются уже к готовой текстуре. -->
+                <Grid x:Name="GlowSpot" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                      Margin="-260,0,0,-220" Opacity="0.45" RenderTransformOrigin="0.5,0.5">
+                    <Grid.CacheMode><BitmapCache /></Grid.CacheMode>
+                    <Grid.RenderTransform><ScaleTransform x:Name="GlowSpotScale" /></Grid.RenderTransform>
+                    <Ellipse Width="640" Height="480">
+                        <Ellipse.Fill>
+                            <RadialGradientBrush>
+                                <GradientStop Color="#66E11D2E" Offset="0" />
+                                <GradientStop Color="#00E11D2E" Offset="1" />
+                            </RadialGradientBrush>
+                        </Ellipse.Fill>
+                        <Ellipse.Effect>
+                            <BlurEffect Radius="100" KernelType="Gaussian" />
+                        </Ellipse.Effect>
+                    </Ellipse>
+                </Grid>
+            </Grid>
+
             <!-- TITLEBAR -->
-            <Border Grid.Row="0"
+            <Border x:Name="TitleBarBorder"
+                    Grid.Row="0"
                     Background="{DynamicResource SidebarBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}"
                     BorderThickness="0,0,0,1"
                     CornerRadius="7,7,0,0"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <DockPanel LastChildFill="False">
-                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
-                        <Image Source="Assets/WideS.png" Width="18" Height="18" Margin="0,0,8,0" />
-                        <TextBlock Text="WideS" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="100" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" MinWidth="140" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,8,0"
+                                HorizontalAlignment="Left">
+                        <Image Source="Assets/WideS.png" Width="18" Height="18" Margin="0,0,10,0" />
+                        <Button x:Name="BackButton" AutomationProperties.Name="Назад" Width="30" Height="28" Style="{StaticResource WindowButton}" ToolTip="Назад (Alt+←)" Click="Back_Click" />
+                        <Button x:Name="ForwardButton" AutomationProperties.Name="Вперёд" Width="30" Height="28" Style="{StaticResource WindowButton}" ToolTip="Вперёд (Alt+→)" Click="Forward_Click" Margin="2,0,0,0" />
+                        <TextBlock x:Name="PageTitle" Text="Проекты" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"
+                                   Margin="12,0,0,1" TextTrimming="CharacterEllipsis" MaxWidth="320" />
                     </StackPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
-                        <Button x:Name="GlobalSearchButton" AutomationProperties.Name="Поиск" Width="36" Height="30" Style="{StaticResource WindowButton}"
-                                ToolTip="Поиск (Ctrl+K)" Click="GlobalSearch_Click" />
-                        <Button x:Name="DockToggleButton" AutomationProperties.Name="Плавающая панель" Width="36" Height="30" Style="{StaticResource WindowButton}"
-                                ToolTip="Floating Dock (Ctrl+Alt+Space)" Click="DockToggle_Click" />
-                        <Button x:Name="MinimizeButton" AutomationProperties.Name="Свернуть" Width="40" Height="30" Style="{StaticResource WindowButton}" Click="Minimize_Click" />
-                        <Button x:Name="MaximizeButton" AutomationProperties.Name="Развернуть" Width="40" Height="30" Style="{StaticResource WindowButton}" Click="Maximize_Click" />
-                        <Button x:Name="CloseButton" AutomationProperties.Name="Скрыть в трей" Width="40" Height="30" Margin="2,0,0,0" Style="{StaticResource DialogCloseButton}" Click="CloseWindow_Click" />
+
+                    <!-- Мини-плеер по центру titlebar -->
+                    <Border x:Name="NowPlayingPanel"
+                            Grid.Column="1"
+                            Background="{DynamicResource AccentSoftBgBrush}"
+                            BorderBrush="{DynamicResource AccentBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="7"
+                            Padding="6,3"
+                            Margin="6,0"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            MouseLeftButtonDown="NowPlayingPanel_MouseLeftButtonDown">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Image x:Name="NpAlbumArt" Width="26" Height="26"
+                                   Margin="0,0,8,0" Stretch="UniformToFill" Visibility="Collapsed"
+                                   VerticalAlignment="Center" />
+                            <StackPanel x:Name="NpContentPanel" VerticalAlignment="Center" Margin="0,0,8,0" MaxWidth="160">
+                                <TextBlock x:Name="NpSource" Visibility="Collapsed" />
+                                <StackPanel x:Name="NpSourceRow" Visibility="Collapsed" />
+                                <TextBlock x:Name="NpTitle" Text="" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="NpArtist" Text="" FontSize="9"
+                                           Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel x:Name="NpControls" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="NpPrev" Width="28" Height="26" Style="{StaticResource WindowButton}"
+                                        Margin="0,0,2,0" ToolTip="Предыдущий" Click="NpPrev_Click" />
+                                <Button x:Name="NpPlay" Width="32" Height="26" Style="{StaticResource WindowButton}"
+                                        ToolTip="Пауза / Играть" Click="NpPlay_Click" />
+                                <Button x:Name="NpNext" Width="28" Height="26" Style="{StaticResource WindowButton}"
+                                        Margin="2,0,0,0" ToolTip="Следующий" Click="NpNext_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0"
+                                HorizontalAlignment="Right">
+                        <Border x:Name="ActiveTaskPill"
+                                Visibility="Collapsed"
+                                Background="{DynamicResource AccentSoftBgBrush}"
+                                BorderBrush="{DynamicResource AccentBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Padding="8,3"
+                                Margin="0,0,10,0"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="ActiveTaskPill_MouseLeftButtonDown"
+                                MouseLeftButtonUp="ActiveTaskPill_Click">
+                            <TextBlock x:Name="ActiveTaskPillText"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="180" />
+                        </Border>
+                        <!-- Веб-инструменты: только в разделах Мессенджеры / Музыка / TikTok / Манга. -->
+                        <StackPanel x:Name="WebToolsPanel" Orientation="Horizontal" VerticalAlignment="Center" Visibility="Collapsed">
+                            <Button x:Name="WebZoomOutButton" AutomationProperties.Name="Мельче" Style="{StaticResource TitleIconButton}"
+                                    ToolTip="Мельче (Ctrl + колесо мыши)" Click="WebZoomOut_Click" />
+                            <TextBlock x:Name="WebZoomText" Text="100%" FontSize="11" MinWidth="36" TextAlignment="Center"
+                                       VerticalAlignment="Center" Cursor="Hand" ToolTip="Сбросить масштаб"
+                                       Foreground="{DynamicResource MutedBrush}" MouseLeftButtonUp="WebZoomReset_Click" />
+                            <Button x:Name="WebZoomInButton" AutomationProperties.Name="Крупнее" Style="{StaticResource TitleIconButton}"
+                                    ToolTip="Крупнее (Ctrl + колесо мыши)" Click="WebZoomIn_Click" />
+                            <Button x:Name="WebHomeButton" AutomationProperties.Name="Домой" Style="{StaticResource TitleIconButton}"
+                                    ToolTip="Домашняя страница сервиса" Click="WebHome_Click" />
+                            <Button x:Name="WebReloadButton" AutomationProperties.Name="Обновить" Style="{StaticResource TitleIconButton}"
+                                    ToolTip="Обновить страницу" Click="WebReload_Click" />
+                            <Button x:Name="WebReaderButton" AutomationProperties.Name="Режим чтения" Style="{StaticResource TitleIconButton}"
+                                    ToolTip="Режим чтения (F11)" Click="WebReader_Click" Visibility="Collapsed" />
+                            <Border Width="1" Height="16" Margin="7,0" Background="{DynamicResource MutedBrush}" Opacity="0.3" />
+                        </StackPanel>
+                        <Button x:Name="GlobalSearchButton" AutomationProperties.Name="Поиск" Style="{StaticResource TitleIconButton}"
+                                ToolTip="Поиск и команды (Ctrl+K)" Click="GlobalSearch_Click" />
+                        <Button x:Name="DockToggleButton" AutomationProperties.Name="Плавающая панель" Style="{StaticResource TitleIconButton}"
+                                ToolTip="Плавающая панель — Floating Dock (Ctrl+Alt+Space)" Click="DockToggle_Click" />
+                        <Grid Width="34" Height="30" Margin="1,0">
+                            <Button x:Name="JournalButton" AutomationProperties.Name="Журнал" Style="{StaticResource TitleIconButton}" Margin="0"
+                                    ToolTip="Журнал действий" Click="Journal_Click" />
+                            <!-- Счётчик нейтральный; красным становится, только если в журнале есть ошибки. -->
+                            <Border x:Name="JournalBadge"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="0,1,1,0"
+                                    Background="{DynamicResource ElevatedBgBrush}"
+                                    CornerRadius="6" MinWidth="12" Height="12" Padding="3,0"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <TextBlock x:Name="JournalBadgeText" FontSize="8" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource MutedBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                        <Border Width="1" Height="16" Margin="7,0" Background="{DynamicResource MutedBrush}" Opacity="0.3" />
+                        <Button x:Name="MinimizeButton" AutomationProperties.Name="Свернуть" Width="40" Height="30" Style="{StaticResource WindowButton}"
+                                ToolTip="Свернуть" Click="Minimize_Click" />
+                        <Button x:Name="MaximizeButton" AutomationProperties.Name="Развернуть" Width="40" Height="30" Style="{StaticResource WindowButton}"
+                                ToolTip="Развернуть" Click="Maximize_Click" />
+                        <Button x:Name="CloseButton" AutomationProperties.Name="Скрыть в трей" Width="40" Height="30" Margin="2,0,0,0" Style="{StaticResource DialogCloseButton}"
+                                ToolTip="Скрыть в трей (выход — через значок в трее)" Click="CloseWindow_Click" />
                     </StackPanel>
-                </DockPanel>
+                </Grid>
             </Border>
 
             <!-- MAIN AREA -->
@@ -55,53 +328,30 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- SIDEBAR -->
-                <Border Grid.Column="0"
+                <Border x:Name="SidebarChromeBorder"
+                        Grid.Column="0"
                         Background="{DynamicResource SidebarBrush}"
                         BorderBrush="{DynamicResource BorderSubtleBrush}"
-                        BorderThickness="0,0,1,0">
-                    <Grid Margin="12,14,12,12">
+                        BorderThickness="0,0,1,0"
+                        ClipToBounds="True">
+                    <Grid x:Name="SidebarInnerGrid" Margin="12,14,12,12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                      Background="Transparent">
                             <StackPanel>
                                 <StackPanel x:Name="NavPanel" />
                             </StackPanel>
                         </ScrollViewer>
 
                         <StackPanel Grid.Row="1">
-                            <Border x:Name="NowPlayingPanel" Background="{DynamicResource AccentSoftBgBrush}" BorderBrush="{DynamicResource AccentBorderBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="10" Margin="0,0,0,8" Visibility="Collapsed">
-                                <DockPanel LastChildFill="True">
-                                    <Image x:Name="NpAlbumArt" DockPanel.Dock="Left" Width="44" Height="44"
-                                           Margin="0,0,10,0" Stretch="UniformToFill" Visibility="Collapsed" />
-                                    <StackPanel x:Name="NpContentPanel">
-                                    <StackPanel x:Name="NpSourceRow" Orientation="Horizontal" Margin="0,0,0,7">
-                                        <Border Width="6" Height="6" CornerRadius="3" Background="{StaticResource AccentBrush}"
-                                                VerticalAlignment="Center" Margin="0,0,7,0" />
-                                        <TextBlock x:Name="NpSource" Text="Сейчас играет" FontSize="9" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="NpTitle" Text="" FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock x:Name="NpArtist" Text="" FontSize="10"
-                                               Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis"
-                                               Margin="0,1,0,8" />
-                                    <StackPanel x:Name="NpControls" Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Button x:Name="NpPrev" Width="30" Height="28" Style="{StaticResource WindowButton}"
-                                                Margin="0,0,6,0" ToolTip="Предыдущий" Click="NpPrev_Click" />
-                                        <Button x:Name="NpPlay" Width="38" Height="28" Style="{StaticResource WindowButton}"
-                                                ToolTip="Пауза / Играть" Click="NpPlay_Click" />
-                                        <Button x:Name="NpNext" Width="30" Height="28" Style="{StaticResource WindowButton}"
-                                                Margin="6,0,0,0" ToolTip="Следующий" Click="NpNext_Click" />
-                                    </StackPanel>
-                                    </StackPanel>
-                                </DockPanel>
-                            </Border>
+                            <!-- «Настройки» закреплены внизу боковой панели. -->
+                            <StackPanel x:Name="NavBottomPanel" Margin="0,6,0,6" />
                             <Border x:Name="SidebarFooterPanel" Background="{DynamicResource SidebarFooterBgBrush}" BorderBrush="{DynamicResource BorderMainBrush}" BorderThickness="1"
-                                    CornerRadius="6" Padding="10,7" Margin="0,0,0,2">
+                                    CornerRadius="8" Padding="10,7" Margin="0,0,0,2">
                                 <TextBlock Text="Локально · защищено DPAPI" FontSize="10"
                                            Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap" />
                             </Border>
@@ -110,87 +360,15 @@
                 </Border>
 
                 <!-- RIGHT CONTENT -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Border Grid.Row="0" Background="{DynamicResource AppBgBrush}" Padding="24,18,24,16"
-                            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
-                        <DockPanel LastChildFill="True">
-                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <Button x:Name="BackButton" AutomationProperties.Name="Назад" Width="32" Height="32" Style="{StaticResource GhostButton}" ToolTip="Назад" Click="Back_Click" />
-                                <Button x:Name="ForwardButton" AutomationProperties.Name="Вперёд" Width="32" Height="32" Style="{StaticResource GhostButton}" ToolTip="Вперёд" Click="Forward_Click" Margin="4,0,0,0" />
-                            </StackPanel>
-                            <Border x:Name="ActiveTaskPill"
-                                    DockPanel.Dock="Right"
-                                    Visibility="Collapsed"
-                                    Background="{DynamicResource AccentSoftBgBrush}"
-                                    BorderBrush="{DynamicResource AccentBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="10,5"
-                                    Margin="0,0,10,0"
-                                    VerticalAlignment="Center"
-                                    Cursor="Hand"
-                                    MouseLeftButtonUp="ActiveTaskPill_Click">
-                                <TextBlock x:Name="ActiveTaskPillText"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AccentBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxWidth="260" />
-                            </Border>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock x:Name="PageTitle" Text="Проекты" Style="{StaticResource PageTitleText}" />
-                                <TextBlock x:Name="PageSubtitle" Text="" FontSize="12"
-                                           Foreground="{DynamicResource MutedBrush}" Margin="0,3,0,0" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </DockPanel>
-                    </Border>
-
-                    <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Disabled"
-                                  Background="{DynamicResource AppBgBrush}"
-                                  Padding="24,5,24,3">
-                        <StackPanel x:Name="TabsPanel" Orientation="Horizontal" />
+                <Grid x:Name="ContentChromeGrid" Grid.Column="1" Background="Transparent">
+                    <ScrollViewer x:Name="ContentScrollViewer" VerticalScrollBarVisibility="Auto" Padding="24,16,24,18"
+                                  Background="Transparent">
+                        <ContentControl x:Name="ContentHost" Background="Transparent" />
                     </ScrollViewer>
-
-                    <ScrollViewer x:Name="ContentScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="24,16,24,18">
-                        <ContentControl x:Name="ContentHost" />
-                    </ScrollViewer>
-
-                    <Border x:Name="LogPanel"
-                            Grid.Row="3"
-                            Background="{DynamicResource LogPanelBgBrush}"
-                            BorderBrush="{DynamicResource BorderSubtleBrush}"
-                            BorderThickness="0,1,0,0"
-                            Padding="24,7"
-                            Height="36"
-                            CornerRadius="0,0,7,7"
-                            Cursor="Hand"
-                            MouseEnter="LogPanel_MouseEnter"
-                            MouseLeave="LogPanel_MouseLeave"
-                            MouseLeftButtonUp="LogPanel_MouseLeftButtonUp">
-                        <DockPanel>
-                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Журнал" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}" Margin="0,0,10,0" />
-                                <Border x:Name="LogBadge" Background="{StaticResource AccentSoftBgBrush}" BorderBrush="{StaticResource AccentBorderBrush}"
-                                        BorderThickness="1" CornerRadius="8" Padding="6,1" Margin="0,0,10,0" Visibility="Collapsed">
-                                    <TextBlock x:Name="LogBadgeText" FontSize="10" Foreground="{StaticResource AccentBrush}" />
-                                </Border>
-                            </StackPanel>
-                            <TextBlock x:Name="LogPreview" DockPanel.Dock="Left" FontFamily="Consolas" FontSize="11"
-                                       Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center"
-                                       TextTrimming="CharacterEllipsis" MaxWidth="900" />
-                            <TextBox x:Name="LogBox" IsReadOnly="True" BorderThickness="0"
-                                     Background="Transparent" FontFamily="{StaticResource MonoFont}" FontSize="12"
-                                     VerticalScrollBarVisibility="Auto" Visibility="Collapsed" />
-                        </DockPanel>
-                    </Border>
+                    <!-- Скрытый буфер журнала (UI — кнопка в titlebar) -->
+                    <TextBox x:Name="LogBox" IsReadOnly="True" BorderThickness="0" Width="0" Height="0"
+                             Opacity="0" IsHitTestVisible="False" Focusable="False"
+                             HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </Grid>
             </Grid>
         </Grid>

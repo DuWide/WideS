@@ -37,16 +37,31 @@ public partial class MainWindow
                      .Where(p => _projectStatusFilter == "All" || p.Status.Equals(_projectStatusFilter, StringComparison.OrdinalIgnoreCase))
                      .OrderByDescending(p => p.CreatedAt)
                      .ToList();
-        if (IsTableView(_viewScope) && projects.Count > 0 && panel is StackPanel)
+        if (projects.Count == 0)
         {
-            panel.Children.Add(ProjectTableHeader());
+            // Одна кнопка действия — «Добавить проект» в панели сверху; карточка по центру области.
+            panel.HorizontalAlignment = System.Windows.HorizontalAlignment.Center;
+            panel.Children.Add(UiHelpers.EmptyState(
+                "Проектов нет",
+                _projectStatusFilter == "All" || _projectStatusFilter == "Active"
+                    ? "Нажмите «Добавить проект» вверху, чтобы создать первый."
+                    : "В этом фильтре пока пусто.",
+                null,
+                null));
         }
+        else if (IsRaycastUi)
+        {
+            foreach (var project in projects)
+                panel.Children.Add(ProjectRaycastRow(project));
+        }
+        else
+        {
+            if (IsTableView(_viewScope) && panel is StackPanel)
+                panel.Children.Add(ProjectTableHeader());
 
-        foreach (var project in projects)
-        {
-            panel.Children.Add(ProjectCard(project));
+            foreach (var project in projects)
+                panel.Children.Add(ProjectCard(project));
         }
-        if (panel.Children.Count == 0) panel.Children.Add(UiHelpers.EmptyState("Проектов нет", "Добавьте первый проект.", "Добавить проект", () => AddProject()));
         ContentHost.Content = root;
     }
     private void ShowProjectDetail(ProjectProfile project, string? tab = null)
@@ -362,7 +377,6 @@ public partial class MainWindow
         _notesStore.Save(_notes);
         _connectionsStore.Save(_connections);
         _tasksStore.Save(_tasks);
-        _openTabs.Remove($"project:{project.Id}");
     }
     private void OpenSelectedFolder()
     {
@@ -480,6 +494,68 @@ public partial class MainWindow
         ("Открывал", new GridLength(120)),
         ("Действия", GridLength.Auto));
 
+    private Border ProjectRaycastRow(ProjectProfile project)
+    {
+        var row = new Border
+        {
+            Background = (WpfBrush)FindResource("CardBrush"),
+            BorderBrush = (WpfBrush)FindResource("BorderSubtleBrush"),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 12, 10, 12),
+            Margin = new Thickness(0, 0, 0, 8),
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var noteCount = _notes.Notes.Count(n => n.WorkspaceId == project.Id);
+        var left = new StackPanel();
+        left.Children.Add(new TextBlock
+        {
+            Text = project.Name,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (WpfBrush)FindResource("TextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        left.Children.Add(new TextBlock
+        {
+            Text = $"{UiHelpers.ProjectStatusDisplay(project.Status)}  ·  {UiHelpers.RelativeDays(project.LastOpenedAt)}  ·  заметок: {noteCount}",
+            FontSize = 11,
+            Foreground = (WpfBrush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 4, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(left, 0);
+        grid.Children.Add(left);
+
+        var actions = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        actions.Children.Add(CompactActionButton("Открыть", () => ShowProjectDetail(project)));
+        actions.Children.Add(RowOverflowButton(
+            ("Рабочая область", () => StartFocusProject(project)),
+            ("Изменить", () => EditProject(project)),
+            ("Cursor", () => OpenWorkspace(project)),
+            ("Удалить из WideS", () => DeleteProject(project))));
+        Grid.SetColumn(actions, 1);
+        grid.Children.Add(actions);
+
+        row.Child = grid;
+        row.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!IsInsideButton(e.OriginalSource as DependencyObject))
+                ShowProjectDetail(project);
+        };
+        return row;
+    }
+
     private Border ProjectCompactRow(ProjectProfile project)
     {
         var grid = CreateTableGrid(
@@ -532,11 +608,16 @@ public partial class MainWindow
                 return;
             }
 
-            list.Children.Add(NoteTableHeader());
-
-            foreach (var note in notes)
+            if (IsRaycastUi)
             {
-                list.Children.Add(NoteCompactRow(note));
+                foreach (var note in notes)
+                    list.Children.Add(NoteRaycastRow(note));
+            }
+            else
+            {
+                list.Children.Add(NoteTableHeader());
+                foreach (var note in notes)
+                    list.Children.Add(NoteCompactRow(note));
             }
         }
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
@@ -573,11 +654,16 @@ public partial class MainWindow
                 return;
             }
 
-            list.Children.Add(ConnectionTableHeader());
-
-            foreach (var connection in items)
+            if (IsRaycastUi)
             {
-                list.Children.Add(ConnectionCompactRow(connection));
+                foreach (var connection in items)
+                    list.Children.Add(ConnectionRaycastRow(connection));
+            }
+            else
+            {
+                list.Children.Add(ConnectionTableHeader());
+                foreach (var connection in items)
+                    list.Children.Add(ConnectionCompactRow(connection));
             }
 
             list.Children.Add(Muted($"{items.Count} подключений · сортировка по названию"));

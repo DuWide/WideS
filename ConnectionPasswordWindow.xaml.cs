@@ -16,7 +16,7 @@ public partial class ConnectionPasswordWindow : Window
     {
         if (!string.IsNullOrWhiteSpace(PasswordBox.Text))
         {
-            WpfClipboard.SetText(PasswordBox.Text);
+            ClipboardSecretService.CopySecret(PasswordBox.Text);
         }
     }
 

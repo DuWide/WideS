@@ -33,19 +33,22 @@ public partial class MainWindow
                          .OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase)
                          .ToList();
 
-            if (notes.Count > 0)
-            {
-                list.Children.Add(NoteTableHeader());
-            }
-
-            foreach (var note in notes)
-            {
-                list.Children.Add(NoteCompactRow(note));
-            }
-
             if (notes.Count == 0)
             {
                 list.Children.Add(UiHelpers.EmptyState("Заметок нет", "Создайте первую заметку.", "Новая заметка", () => AddNote()));
+                return;
+            }
+
+            if (IsRaycastUi)
+            {
+                foreach (var note in notes)
+                    list.Children.Add(NoteRaycastRow(note));
+            }
+            else
+            {
+                list.Children.Add(NoteTableHeader());
+                foreach (var note in notes)
+                    list.Children.Add(NoteCompactRow(note));
             }
         }
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
@@ -68,8 +71,9 @@ public partial class MainWindow
             AddLog("OK", $"Заметка сохранена: {note.Title}");
             RefreshAfterNoteChange(note);
         };
-        WindowPlacementService.PlaceOnSecondary(win);
+        WindowPlacementService.PlaceNearOwner(win);
         win.Show();
+        EditorWindowHelper.BringToFrontTemporarily(win);
     }
     private void ShowProjectNotes(ProjectProfile project)
     {
@@ -87,17 +91,23 @@ public partial class MainWindow
                          .OrderBy(n => n.Title, StringComparer.CurrentCultureIgnoreCase)
                          .ToList();
 
-            if (notes.Count > 0)
+            if (notes.Count == 0)
+            {
+                list.Children.Add(CardText("Пусто", "Заметки проекта не найдены."));
+                return;
+            }
+
+            if (IsRaycastUi)
+            {
+                foreach (var note in notes)
+                    list.Children.Add(NoteRaycastRow(note));
+            }
+            else
             {
                 list.Children.Add(NoteTableHeader());
+                foreach (var note in notes)
+                    list.Children.Add(NoteCompactRow(note));
             }
-
-            foreach (var note in notes)
-            {
-                list.Children.Add(NoteCompactRow(note));
-            }
-
-            if (notes.Count == 0) list.Children.Add(CardText("Пусто", "Заметки проекта не найдены."));
         }
         top.Children.Add(ActionButton("Новая заметка", () => AddNote()));
         top.Children.Add(ActionButton("Импорт TXT", () => ManualImportTxtNotes(project), false));
@@ -124,12 +134,14 @@ public partial class MainWindow
             AddLog("OK", $"Заметка добавлена: {win.Note.Title}");
             RefreshAfterNoteChange(win.Note);
         };
-        WindowPlacementService.PlaceOnSecondary(win);
+        WindowPlacementService.PlaceNearOwner(win);
         win.Show();
+        EditorWindowHelper.BringToFrontTemporarily(win);
     }
     private void EditNote(NoteItem note)
     {
-        if (EditorWindowHelper.TryActivate(note.Id)) return;
+        if (EditorWindowHelper.TryActivate<NoteEditorWindow>(note.Id)) return;
+        EditorWindowHelper.CloseRegistered(note.Id);
 
         var win = CreateNoteEditor(note);
         EditorWindowHelper.Register(note.Id, win);
@@ -142,8 +154,9 @@ public partial class MainWindow
             AddLog("OK", $"Заметка изменена: {win.Note.Title}");
             RefreshAfterNoteChange(win.Note);
         };
-        WindowPlacementService.PlaceOnSecondary(win);
+        WindowPlacementService.PlaceNearOwner(win);
         win.Show();
+        EditorWindowHelper.BringToFrontTemporarily(win);
     }
     private NoteEditorWindow CreateNoteEditor(NoteItem? source)
     {
@@ -258,6 +271,67 @@ public partial class MainWindow
         ("Заголовок", new GridLength(2, GridUnitType.Star)),
         ("Обновлено", new GridLength(120)),
         ("Действия", GridLength.Auto));
+
+    private Border NoteRaycastRow(NoteItem note)
+    {
+        var title = note.IsImportant ? "! " + note.Title : note.Title;
+        var row = new Border
+        {
+            Background = (WpfBrush)FindResource("CardBrush"),
+            BorderBrush = (WpfBrush)FindResource("BorderSubtleBrush"),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 12, 10, 12),
+            Margin = new Thickness(0, 0, 0, 8),
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var left = new StackPanel();
+        left.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = note.IsImportant
+                ? (WpfBrush)FindResource("WarnBrush")
+                : (WpfBrush)FindResource("TextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        left.Children.Add(new TextBlock
+        {
+            Text = $"Обновлено  ·  {note.UpdatedAt:dd.MM.yyyy HH:mm}",
+            FontSize = 11,
+            Foreground = (WpfBrush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+        Grid.SetColumn(left, 0);
+        grid.Children.Add(left);
+
+        var actions = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+        actions.Children.Add(CompactActionButton("Открыть", () => ViewNote(note)));
+        actions.Children.Add(RowOverflowButton(
+            ("Изменить", () => EditNote(note)),
+            ("Удалить", () => DeleteNote(note))));
+        Grid.SetColumn(actions, 1);
+        grid.Children.Add(actions);
+
+        row.Child = grid;
+        row.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!IsInsideButton(e.OriginalSource as DependencyObject))
+                ViewNote(note);
+        };
+        return row;
+    }
 
     private Border NoteCompactRow(NoteItem note)
     {

@@ -47,14 +47,29 @@ public partial class MainWindow
                 return;
             }
 
-            list.Children.Add(TaskTableHeader());
-            foreach (var task in tasks)
+            if (IsRaycastUi)
             {
-                list.Children.Add(TaskCompactRow(task));
+                foreach (var task in tasks)
+                {
+                    list.Children.Add(TaskRaycastRow(task));
+                }
+            }
+            else
+            {
+                list.Children.Add(TaskTableHeader());
+                foreach (var task in tasks)
+                {
+                    list.Children.Add(TaskCompactRow(task));
+                }
             }
         }
 
         toolbar.Children.Add(ActionButton("Новая задача", () => AddTask()));
+        if (IsRaycastUi)
+        {
+            toolbar.Children.Add(ToolbarGap(10));
+        }
+
         foreach (var tab in new[] { "Все", "В работе", "Запланировано", "Выполнено" })
         {
             toolbar.Children.Add(FilterButton(tab, _taskTab == tab, () =>
@@ -63,7 +78,20 @@ public partial class MainWindow
                 ShowTasks();
             }));
         }
-        var toolbarShell = new Border { Style = (Style)FindResource("SectionToolbar"), Child = toolbar };
+
+        var toolbarShell = new Border
+        {
+            Style = (Style)FindResource("SectionToolbar"),
+            Child = toolbar
+        };
+        if (IsRaycastUi)
+        {
+            toolbarShell.Background = (WpfBrush)FindResource("PanelBrush");
+            toolbarShell.CornerRadius = new CornerRadius(12);
+            toolbarShell.BorderThickness = new Thickness(0);
+            toolbarShell.Padding = new Thickness(10, 8, 10, 8);
+        }
+
         DockPanel.SetDock(toolbarShell, Dock.Top);
         root.Children.Add(toolbarShell);
         Render();
@@ -83,8 +111,7 @@ public partial class MainWindow
             AddLog("OK", $"Задача добавлена: {win.Task.Title}");
             RefreshAfterTaskChange(win.Task);
         };
-        WindowPlacementService.PlaceOnPrimary(win);
-        win.Show();
+        EditorWindowHelper.ShowNearOwner(win);
     }
     private void EditTask(TaskItem task)
     {
@@ -101,8 +128,7 @@ public partial class MainWindow
             AddLog("OK", $"Задача изменена: {win.Task.Title}");
             RefreshAfterTaskChange(win.Task);
         };
-        WindowPlacementService.PlaceOnPrimary(win);
-        win.Show();
+        EditorWindowHelper.ShowNearOwner(win);
     }
     private void StartTask(TaskItem task, bool openEditor = false)
     {
@@ -307,6 +333,131 @@ public partial class MainWindow
         ("Дата", new GridLength(110)),
         ("Статус", new GridLength(100)),
         ("Действия", GridLength.Auto));
+
+    /// <summary>Raycast-стиль: отдельные стеклянные строки, одна главная кнопка + меню «⋯».</summary>
+    private Border TaskRaycastRow(TaskItem task)
+    {
+        var row = new Border
+        {
+            Background = (WpfBrush)FindResource("CardBrush"),
+            BorderBrush = (WpfBrush)FindResource("BorderSubtleBrush"),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14, 12, 10, 12),
+            Margin = new Thickness(0, 0, 0, 8),
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var left = new StackPanel();
+        var titleRow = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+        titleRow.Children.Add(new Border
+        {
+            Width = 8,
+            Height = 8,
+            CornerRadius = new CornerRadius(4),
+            Background = ImportanceBrush(task.Importance),
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        titleRow.Children.Add(new TextBlock
+        {
+            Text = task.Title,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (WpfBrush)FindResource("TextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        left.Children.Add(titleRow);
+
+        var meta = new TextBlock
+        {
+            Text = $"{(task.StartAt.Year <= 2000 ? "Без даты" : task.StartAt.ToString("dd.MM.yyyy HH:mm"))}  ·  {(IsTaskRunning(task) ? "В работе" : IsTaskPaused(task) ? "На паузе" : TaskStatusText(task))}",
+            FontSize = 11,
+            Foreground = (WpfBrush)FindResource("MutedBrush"),
+            Margin = new Thickness(16, 4, 0, 0)
+        };
+        left.Children.Add(meta);
+        Grid.SetColumn(left, 0);
+        grid.Children.Add(left);
+
+        var actions = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0)
+        };
+
+        var menuItems = new List<(string Label, Action Run)>();
+        if (task.IsDone)
+        {
+            actions.Children.Add(CompactActionButton("Вернуть", () => RestoreTask(task)));
+        }
+        else if (IsTaskRunning(task))
+        {
+            actions.Children.Add(CompactActionButton("Пауза", () => PauseTask(task)));
+            menuItems.Add(("Готово", () => CompleteTaskWithRecurrence(task)));
+        }
+        else if (IsTaskPaused(task))
+        {
+            actions.Children.Add(CompactActionButton("Далее", () => StartTask(task, openEditor: false)));
+            menuItems.Add(("Готово", () => CompleteTaskWithRecurrence(task)));
+        }
+        else
+        {
+            actions.Children.Add(CompactActionButton("Начать", () => StartTask(task)));
+            menuItems.Add(("Готово", () => CompleteTaskWithRecurrence(task)));
+        }
+
+        menuItems.Add(("Изменить", () => EditTask(task)));
+        actions.Children.Add(RowOverflowButton(menuItems.ToArray()));
+        Grid.SetColumn(actions, 1);
+        grid.Children.Add(actions);
+
+        row.Child = grid;
+        row.MouseLeftButtonUp += (_, e) =>
+        {
+            if (!IsInsideButton(e.OriginalSource as DependencyObject))
+            {
+                EditTask(task);
+            }
+        };
+        return row;
+    }
+
+    private WpfButton RowOverflowButton(params (string Label, Action Run)[] items)
+    {
+        var button = new WpfButton
+        {
+            Content = MakeIcon("more", 14),
+            Style = (Style)FindResource("WindowButton"),
+            Width = 30,
+            Height = 28,
+            Margin = new Thickness(2, 0, 0, 0),
+            ToolTip = "Ещё действия",
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        var menu = new ContextMenu();
+        foreach (var (label, run) in items)
+        {
+            var item = new MenuItem { Header = label };
+            item.Click += (_, _) => run();
+            menu.Items.Add(item);
+        }
+
+        button.Click += (_, e) =>
+        {
+            e.Handled = true;
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+        };
+        return button;
+    }
 
     private Border TaskCompactRow(TaskItem task)
     {

@@ -18,7 +18,13 @@
         </Border.Effect>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <!-- Логотип -->
-            <Image Source="Assets/WideS.png" Width="22" Height="22" Margin="6,0,10,0" VerticalAlignment="Center" />
+            <!-- Контурный логотип в цветах темы вместо яркой белой плитки -->
+            <Border Width="26" Height="26" Margin="6,0,10,0" VerticalAlignment="Center" CornerRadius="7"
+                    Background="{DynamicResource AccentSoftBgBrush}" BorderBrush="{DynamicResource AccentBorderBrush}" BorderThickness="1"
+                    ToolTip="WideS">
+                <TextBlock Text="W" FontSize="14" FontWeight="Black" Foreground="{DynamicResource AccentBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
+            </Border>
 
             <!-- Быстрые действия -->
             <Button x:Name="TaskButton" Style="{StaticResource DockButton}" Click="Task_Click" ToolTip="Новая задача" />
